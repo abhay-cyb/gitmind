@@ -15,7 +15,7 @@ export class AIProvider {
   public static getSelectedModel(): string {
     return vscode.workspace
       .getConfiguration('gitmind')
-      .get<string>('openrouterModel', 'google/gemma-3-12b-it:free');
+      .get<string>('openrouterModel', 'google/gemini-2.0-flash-exp:free');
   }
 
   public static async setSelectedModel(model: string): Promise<void> {

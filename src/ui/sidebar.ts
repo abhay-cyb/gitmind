@@ -652,10 +652,10 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 
-      // Translate code blocks ```code```
-      escaped = escaped.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-      // Translate inline code `code`
-      escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+      // Translate code blocks
+      escaped = escaped.replace(/\`\`\`([\s\S]*?)\`\`\`/g, '<pre><code>$1</code></pre>');
+      // Translate inline code
+      escaped = escaped.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
       
       // Parse markdown links [text](url)
       escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a class="github-link" onclick="openUrl(\'$2\')">$1</a>');
@@ -669,14 +669,7 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
         const bubble = document.createElement('div');
         bubble.id = 'thinking-bubble';
         bubble.className = 'bubble thinking';
-        bubble.innerHTML = `
-          <span>Thinking</span>
-          <span class="thinking-dots">
-            <span></span>
-            <span></span>
-            <span></span>
-          </span>
-        `;
+        bubble.innerHTML = '<span>Thinking</span><span class="thinking-dots"><span></span><span></span><span></span></span>';
         chatPanel.appendChild(bubble);
         chatPanel.scrollTop = chatPanel.scrollHeight;
       } else if (!visible && existing) {
@@ -690,7 +683,7 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       bubble.className = 'bubble assistant';
       bubble.style.borderColor = '#f48771';
       bubble.style.background = 'rgba(244,135,113,0.05)';
-      bubble.innerHTML = `<span style="color:#f48771; font-weight:600;">Error:</span> ${msg}`;
+      bubble.innerHTML = '<span style="color:#f48771; font-weight:600;">Error:</span> ' + msg;
       chatPanel.appendChild(bubble);
       chatPanel.scrollTop = chatPanel.scrollHeight;
     }
@@ -700,8 +693,8 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       toggleThinking(false);
       const bubble = document.createElement('div');
       bubble.className = 'bubble assistant';
-      let titleHtml = title ? `<h4 style="margin: 0 0 6px 0; border-bottom: 1px solid var(--border-color); padding-bottom:4px;">${title}</h4>` : '';
-      bubble.innerHTML = `${titleHtml}${content}`;
+      let titleHtml = title ? ('<h4 style="margin: 0 0 6px 0; border-bottom: 1px solid var(--border-color); padding-bottom:4px;">' + title + '</h4>') : '';
+      bubble.innerHTML = titleHtml + content;
       chatPanel.appendChild(bubble);
       chatPanel.scrollTop = chatPanel.scrollHeight;
     }
