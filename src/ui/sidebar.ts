@@ -26,7 +26,7 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri]
     };
 
-    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+    webviewView.webview.html = this._getHtmlForWebview();
 
     webviewView.webview.onDidReceiveMessage(data => {
       this._onAction(data);
@@ -45,6 +45,12 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  public updateGitHubStatus(username: string | null): void {
+    if (this._view) {
+      this._view.webview.postMessage({ type: 'githubStatus', username });
+    }
+  }
+
   public showResult(resultHtml: string, title?: string): void {
     if (this._view) {
       this._view.webview.postMessage({ type: 'result', content: resultHtml, title });
@@ -57,7 +63,7 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  public updateChat(history: Array<{ role: string; content: string }>): void {
+  public updateChat(history: Array<{ role: string; content: string; isHtml?: boolean }>): void {
     if (this._view) {
       this._view.webview.postMessage({ type: 'chatHistory', history });
     }
@@ -69,7 +75,13 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private _getHtmlForWebview(_webview: vscode.Webview): string {
+  public setThinking(visible: boolean): void {
+    if (this._view) {
+      this._view.webview.postMessage({ type: 'thinking', visible });
+    }
+  }
+
+  private _getHtmlForWebview(): string {
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -78,13 +90,14 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
   <title>GitMind</title>
   <style>
     :root {
-      --gitmind-accent: #8e2de2;
-      --gitmind-accent-hover: #4a00e0;
-      --gitmind-glow: rgba(142, 45, 226, 0.25);
+      --gitmind-accent: var(--vscode-button-background, #8e2de2);
+      --gitmind-accent-hover: var(--vscode-button-hoverBackground, #4a00e0);
+      --gitmind-glow: rgba(142, 45, 226, 0.15);
+      --border-color: var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
     }
     
     body {
-      padding: 10px;
+      padding: 0;
       font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
       color: var(--vscode-foreground);
       background-color: var(--vscode-sideBar-background);
@@ -94,170 +107,208 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       height: 100vh;
       box-sizing: border-box;
       font-size: var(--vscode-font-size, 13px);
+      overflow: hidden;
     }
 
-    .section {
-      margin-bottom: 12px;
-      flex-shrink: 0;
-    }
-
-    .card {
-      background: var(--vscode-editor-background);
-      border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
-      border-radius: 8px;
+    /* Fixed Header */
+    .header {
+      background: var(--vscode-sideBar-background);
+      border-bottom: 1px solid var(--border-color);
       padding: 12px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 10;
     }
 
-    .status-container {
+    .header-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 8px;
+    }
+
+    .brand-title {
+      font-weight: 700;
+      font-size: 1.15em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(90deg, #00f2fe, #8e2de2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.85em;
     }
 
     .status-badge {
       display: inline-flex;
       align-items: center;
+      gap: 4px;
+      font-weight: 500;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border-color);
+    }
+
+    .status-badge.ready { color: #4ec9b0; }
+    .status-badge.scanning { color: #ce9178; }
+    .status-badge.error { color: #f48771; }
+
+    .github-status {
+      display: inline-flex;
+      align-items: center;
       gap: 5px;
-      font-weight: 600;
-      font-size: 0.85em;
-      padding: 3px 8px;
-      border-radius: 12px;
-      background: rgba(255,255,255,0.05);
-    }
-
-    .status-badge.ready {
-      color: #4ec9b0;
-      background: rgba(78, 201, 176, 0.1);
-    }
-
-    .status-badge.scanning {
-      color: #ce9178;
-      background: rgba(206, 145, 120, 0.1);
-    }
-
-    .status-badge.error {
-      color: #f48771;
-      background: rgba(244, 135, 113, 0.1);
-    }
-
-    label {
-      font-weight: 600;
-      display: block;
-      margin-bottom: 6px;
+      font-weight: 500;
       color: var(--vscode-descriptionForeground);
     }
 
-    select, input, button {
-      width: 100%;
-      box-sizing: border-box;
-      font-family: inherit;
-      font-size: inherit;
-      border-radius: 6px;
-      transition: all 0.2s ease;
+    .github-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+      background: #888888;
+    }
+    .github-dot.connected {
+      background: #4ec9b0;
+      box-shadow: 0 0 6px #4ec9b0;
     }
 
+    /* Model Select dropdown */
+    .model-select-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
     select {
       background: var(--vscode-dropdown-background);
       color: var(--vscode-dropdown-foreground);
       border: 1px solid var(--vscode-dropdown-border, rgba(255,255,255,0.15));
-      padding: 8px;
+      padding: 6px;
+      border-radius: 4px;
       outline: none;
       cursor: pointer;
+      font-size: 0.95em;
     }
-
     select:focus {
       border-color: var(--gitmind-accent);
     }
 
-    .btn {
-      background: var(--vscode-button-background, var(--gitmind-accent));
-      color: var(--vscode-button-foreground, #ffffff);
-      border: none;
-      padding: 10px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      box-shadow: 0 2px 6px var(--gitmind-glow);
-    }
-
-    .btn:hover {
-      background: var(--vscode-button-hoverBackground, var(--gitmind-accent-hover));
-      transform: translateY(-1px);
-    }
-
-    .btn-secondary {
-      background: transparent;
-      color: var(--vscode-foreground);
-      border: 1px solid var(--vscode-button-border, rgba(255,255,255,0.15));
-      margin-top: 6px;
-      box-shadow: none;
-    }
-
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.05);
-    }
-
-    /* Main Scrollable Results Panel */
-    .results-scrollable {
+    /* Scrollable Chat Area */
+    .chat-messages {
       flex: 1;
       overflow-y: auto;
-      margin-bottom: 12px;
-      border: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.08));
-      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--vscode-sideBar-background);
+    }
+
+    /* Message Bubbles */
+    .bubble {
+      max-width: 85%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      line-height: 1.45;
+      word-wrap: break-word;
+      animation: bubbleFadeIn 0.25s ease-out;
+      font-size: 0.95em;
+    }
+
+    @keyframes bubbleFadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .bubble.user {
+      align-self: flex-end;
+      background: var(--gitmind-accent);
+      color: var(--vscode-button-foreground, #ffffff);
+      border-bottom-right-radius: 2px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    .bubble.assistant {
+      align-self: flex-start;
       background: var(--vscode-editor-background);
-      padding: 10px;
-      min-height: 100px;
+      color: var(--vscode-foreground);
+      border-bottom-left-radius: 2px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
-    .placeholder-text {
-      color: var(--vscode-descriptionForeground);
-      text-align: center;
-      padding: 20px;
+    .bubble.thinking {
+      align-self: flex-start;
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--border-color);
+      border-bottom-left-radius: 2px;
       font-style: italic;
+      color: var(--vscode-descriptionForeground);
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
-    /* AI output styling */
-    .ai-output {
-      line-height: 1.5;
+    .thinking-dots {
+      display: inline-flex;
+      gap: 3px;
+    }
+    .thinking-dots span {
+      width: 5px;
+      height: 5px;
+      background-color: var(--vscode-descriptionForeground);
+      border-radius: 50%;
+      animation: pulse 1.4s infinite both;
+    }
+    .thinking-dots span:nth-child(2) { animation-delay: .2s; }
+    .thinking-dots span:nth-child(3) { animation-delay: .4s; }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(0.6); opacity: 0.4; }
+      50% { transform: scale(1.2); opacity: 1; }
     }
 
-    .ai-output p {
-      margin: 0 0 10px 0;
-    }
-
-    .ai-output h3 {
-      margin: 15px 0 8px 0;
-      font-size: 1.1em;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      padding-bottom: 4px;
-    }
-
-    .risk-badge {
-      display: inline-block;
-      padding: 2px 6px;
+    /* Code & Markdown styled outputs inside assistant bubbles */
+    .assistant code {
+      background: rgba(255,255,255,0.06);
+      padding: 2px 4px;
       border-radius: 4px;
-      font-weight: bold;
-      font-size: 0.85em;
-      margin-right: 6px;
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: 0.9em;
     }
 
-    .risk-high { background: rgba(244, 135, 113, 0.2); color: #f48771; }
-    .risk-medium { background: rgba(220, 220, 0, 0.15); color: #dcdcaa; }
-    .risk-low { background: rgba(78, 201, 176, 0.2); color: #4ec9b0; }
+    .assistant pre {
+      background: rgba(0, 0, 0, 0.15);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px;
+      overflow-x: auto;
+      margin: 8px 0;
+    }
+    .assistant pre code {
+      background: transparent;
+      padding: 0;
+    }
 
+    /* Risk indicators */
     .commit-card {
       border-left: 4px solid var(--gitmind-accent);
       background: rgba(255,255,255,0.02);
-      border-radius: 0 8px 8px 0;
-      padding: 10px;
-      margin-bottom: 12px;
+      border-radius: 0 6px 6px 0;
+      padding: 8px;
+      margin: 8px 0;
+      border: 1px solid var(--border-color);
+      border-left-width: 4px;
     }
-
     .commit-card.high { border-left-color: #f48771; }
     .commit-card.medium { border-left-color: #dcdcaa; }
     .commit-card.low { border-left-color: #4ec9b0; }
@@ -266,108 +317,68 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       display: flex;
       justify-content: space-between;
       font-weight: 600;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
-
     .commit-hash {
       color: #569cd6;
       cursor: pointer;
       text-decoration: underline;
     }
 
-    .commit-body {
-      font-size: 0.95em;
-      color: var(--vscode-foreground);
-    }
-
-    .commit-footer {
-      margin-top: 6px;
-      font-size: 0.85em;
-      color: var(--vscode-descriptionForeground);
-    }
-
-    .conflict-container {
-      background: rgba(255, 255, 255, 0.02);
-      border-radius: 8px;
-      padding: 12px;
-      border: 1px dashed var(--vscode-textSeparator-foreground);
-    }
-
-    .conflict-file {
-      font-weight: bold;
-      color: #ce9178;
-      margin-bottom: 10px;
-    }
-
-    /* Loader */
-    .loader {
+    /* Quick Action Buttons (shown when chat is empty) */
+    .quick-actions {
       display: flex;
       flex-direction: column;
+      gap: 8px;
+      padding: 20px 10px;
+      margin: auto 0;
       align-items: center;
-      justify-content: center;
-      padding: 20px;
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    .welcome-text {
       text-align: center;
       color: var(--vscode-descriptionForeground);
+      margin-bottom: 16px;
+      font-size: 0.95em;
     }
 
-    .spinner {
-      border: 3px solid rgba(255,255,255,0.1);
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      border-left-color: var(--gitmind-accent);
-      animation: spin 1s linear infinite;
-      margin-bottom: 10px;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    /* Chat Section */
-    .chat-container {
-      flex-shrink: 0;
+    .action-btn {
       background: var(--vscode-editor-background);
-      border-top: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
-      padding-top: 10px;
-    }
-
-    .chat-history {
-      max-height: 140px;
-      overflow-y: auto;
-      margin-bottom: 8px;
-      font-size: 0.9em;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      padding: 2px;
-    }
-
-    .chat-bubble {
-      padding: 6px 10px;
-      border-radius: 8px;
-      max-width: 90%;
-      line-height: 1.4;
-      word-wrap: break-word;
-    }
-
-    .chat-bubble.user {
-      align-self: flex-end;
-      background: var(--gitmind-accent);
-      color: #ffffff;
-    }
-
-    .chat-bubble.assistant {
-      align-self: flex-start;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.05));
+      border: 1px solid var(--border-color);
       color: var(--vscode-foreground);
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 85%;
+      text-align: left;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .action-btn:hover {
+      border-color: var(--gitmind-accent);
+      background: rgba(255,255,255,0.03);
+      transform: translateY(-1px);
     }
 
-    .chat-input-wrapper {
+    .action-icon {
+      font-size: 1.2em;
+    }
+
+    /* Fixed Input Box at Bottom */
+    .input-container {
+      background: var(--vscode-sideBar-background);
+      border-top: 1px solid var(--border-color);
+      padding: 10px;
+      flex-shrink: 0;
       display: flex;
-      gap: 6px;
+      gap: 8px;
+      align-items: flex-end;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
     }
 
     .chat-input {
@@ -375,93 +386,157 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       background: var(--vscode-input-background);
       color: var(--vscode-input-foreground);
       border: 1px solid var(--vscode-input-border, rgba(255,255,255,0.15));
-      padding: 8px 12px;
+      border-radius: 6px;
+      padding: 8px 10px;
       outline: none;
+      resize: none;
+      font-family: inherit;
+      font-size: inherit;
+      max-height: 80px;
+      min-height: 20px;
+      line-height: 1.4;
+      box-sizing: border-box;
     }
-
     .chat-input:focus {
       border-color: var(--gitmind-accent);
     }
 
-    .chat-send-btn {
-      width: auto;
-      padding: 0 14px;
+    .send-btn {
+      background: var(--gitmind-accent);
+      color: var(--vscode-button-foreground, #ffffff);
+      border: none;
+      border-radius: 6px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 34px;
+      transition: background-color 0.2s;
+    }
+    .send-btn:hover {
+      background: var(--gitmind-accent-hover);
+    }
+
+    /* Links inside assistant bubbles */
+    .github-link {
+      color: #569cd6;
+      text-decoration: underline;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
   
-  <!-- Header / Settings -->
-  <div class="section card">
-    <div class="status-container">
-      <span>Status:</span>
-      <span id="status-badge" class="status-badge ready">Checking...</span>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <div class="brand-title">🧠 GitMind V2</div>
+      <div id="scan-badge" class="status-badge ready">Checking...</div>
     </div>
     
-    <label for="model-select">AI Model</label>
-    <select id="model-select" onchange="changeModel()">
-      <option value="google/gemma-3-12b-it:free">google/gemma-3-12b-it:free (Fast, Free)</option>
-      <option value="google/gemma-3-27b-it:free">google/gemma-3-27b-it:free (Smarter, Free)</option>
-      <option value="deepseek/deepseek-r1:free">deepseek/deepseek-r1:free (Reasoning, Free)</option>
-      <option value="meta-llama/llama-4-scout:free">meta-llama/llama-4-scout:free (Balanced, Free)</option>
-      <option value="qwen/qwen3-235b-a22b:free">qwen/qwen3-235b-a22b:free (Capable, Free)</option>
-      <option value="anthropic/claude-3.5-haiku">anthropic/claude-3.5-haiku (Fast, Paid)</option>
-      <option value="openai/gpt-4o-mini">openai/gpt-4o-mini (Reliable, Paid)</option>
-    </select>
-  </div>
+    <div class="status-row">
+      <div class="github-status">
+        <span id="github-dot" class="github-dot"></span>
+        <span id="github-label">Not connected</span>
+      </div>
+    </div>
 
-  <!-- Primary Operations -->
-  <div class="section" style="display: flex; gap: 6px;">
-    <button class="btn" style="flex: 1;" onclick="findBreakingCommit()">
-      <span>🔴</span> Find Breaking Commit
-    </button>
-    <button class="btn btn-secondary" style="width: auto; margin-top: 0; padding: 0 10px;" title="Refresh Repository Context" onclick="refreshContext()">
-      <span>🔄</span>
-    </button>
-  </div>
-
-  <!-- Dynamic Results Scroll Area -->
-  <div class="results-scrollable" id="results-panel">
-    <div class="placeholder-text" id="placeholder-msg">
-      No analyses run yet. Click 'Find Breaking Commit' or type in chat below.
+    <div class="model-select-wrapper">
+      <select id="model-select" onchange="changeModel()">
+        <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash — Free ⭐</option>
+        <option value="google/gemma-3-12b-it:free">Gemma 3 12B — Free</option>
+        <option value="google/gemma-3-27b-it:free">Gemma 3 27B — Free</option>
+        <option value="deepseek/deepseek-r1:free">DeepSeek R1 — Free</option>
+        <option value="meta-llama/llama-4-scout:free">Llama 4 Scout — Free</option>
+        <option value="qwen/qwen3-235b-a22b:free">Qwen3 235B — Free</option>
+        <option value="anthropic/claude-3.5-haiku">Claude 3.5 Haiku</option>
+        <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+      </select>
     </div>
   </div>
 
-  <!-- Chat Panel -->
-  <div class="chat-container">
-    <div class="chat-history" id="chat-history-panel"></div>
-    <div class="chat-input-wrapper">
-      <input type="text" class="chat-input" id="chat-query" placeholder="Ask about changes..." onkeydown="handleChatKeyDown(event)">
-      <button class="btn chat-send-btn" onclick="sendChat()">Send</button>
+  <!-- Messages scroll area -->
+  <div class="chat-messages" id="chat-messages-panel">
+    <!-- Quick Actions when empty -->
+    <div class="quick-actions" id="quick-actions-panel">
+      <div class="welcome-text">Select a quick action or type a command below.</div>
+      
+      <button class="action-btn" onclick="findBreakingCommit()">
+        <span class="action-icon">🔍</span>
+        <span>Find Breaking Commit</span>
+      </button>
+      
+      <button class="action-btn" onclick="explainConflict()">
+        <span class="action-icon">⚡</span>
+        <span>Explain Conflict</span>
+      </button>
+
+      <button class="action-btn" onclick="listRepos()">
+        <span class="action-icon">📋</span>
+        <span>List My Repos</span>
+      </button>
+
+      <button class="action-btn" onclick="connectGitHub()">
+        <span class="action-icon">🔗</span>
+        <span>Connect GitHub</span>
+      </button>
     </div>
+  </div>
+
+  <!-- Input Area -->
+  <div class="input-container">
+    <textarea class="chat-input" id="chat-input" placeholder="Ask about git or run GitHub commands..." rows="1" onkeydown="handleInputKeyDown(event)"></textarea>
+    <button class="send-btn" onclick="submitMessage()">Send</button>
   </div>
 
   <script>
     const vscode = acquireVsCodeApi();
-    
-    // Set initial model dropdown if passed previously
+    const chatPanel = document.getElementById('chat-messages-panel');
+    const input = document.getElementById('chat-input');
+
+    // Message receiver
     window.addEventListener('message', event => {
       const message = event.data;
       switch (message.type) {
         case 'status':
-          const badge = document.getElementById('status-badge');
+          const badge = document.getElementById('scan-badge');
           badge.innerText = message.text;
           badge.className = 'status-badge ' + (message.isError ? 'error' : (message.text.toLowerCase().includes('scanning') ? 'scanning' : 'ready'));
           break;
+          
+        case 'githubStatus':
+          const dot = document.getElementById('github-dot');
+          const label = document.getElementById('github-label');
+          if (message.username) {
+            dot.className = 'github-dot connected';
+            label.innerText = 'Connected: @' + message.username;
+          } else {
+            dot.className = 'github-dot';
+            label.innerText = 'Not connected';
+          }
+          break;
+
         case 'model':
           document.getElementById('model-select').value = message.model;
           break;
-        case 'loader':
-          toggleLoader(message.visible, message.text);
-          break;
-        case 'result':
-          renderResult(message.content, message.title);
-          break;
-        case 'error':
-          renderError(message.message);
-          break;
+
         case 'chatHistory':
-          renderChatHistory(message.history);
+          renderHistory(message.history);
+          break;
+
+        case 'thinking':
+          toggleThinking(message.visible);
+          break;
+
+        case 'error':
+          appendError(message.message);
+          break;
+
+        case 'result':
+          // Existing commands legacy fallback compatibility
+          appendResult(message.content, message.title);
           break;
       }
     });
@@ -478,28 +553,49 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       vscode.postMessage({ command: 'findBreakingCommit' });
     }
 
-    function refreshContext() {
-      vscode.postMessage({ command: 'refreshContext' });
+    function explainConflict() {
+      vscode.postMessage({ command: 'explainConflict' });
     }
 
-    function handleChatKeyDown(event) {
-      if (event.key === 'Enter') {
-        sendChat();
+    function listRepos() {
+      vscode.postMessage({
+        command: 'chatQuery',
+        query: 'list my repos'
+      });
+    }
+
+    // Runs connectGitHub command in extension
+    function connectGitHub() {
+      vscode.postMessage({ command: 'connectGitHub' });
+    }
+
+    function handleInputKeyDown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        submitMessage();
       }
     }
 
-    function sendChat() {
-      const input = document.getElementById('chat-query');
-      const val = input.value.trim();
-      if (!val) return;
+    function submitMessage() {
+      const text = input.value.trim();
+      if (!text) return;
       
       vscode.postMessage({
         command: 'chatQuery',
-        query: val
+        query: text
       });
+      
       input.value = '';
+      adjustInputHeight();
     }
 
+    function adjustInputHeight() {
+      input.style.height = 'auto';
+      input.style.height = input.scrollHeight + 'px';
+    }
+    input.addEventListener('input', adjustInputHeight);
+
+    // Callbacks inside bubbles
     function viewCommit(hash) {
       vscode.postMessage({
         command: 'viewCommit',
@@ -507,48 +603,106 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       });
     }
 
-    function toggleLoader(visible, text) {
-      const panel = document.getElementById('results-panel');
-      if (visible) {
-        // Clear panel and add loader
-        panel.innerHTML = \`
-          <div class="loader">
-            <div class="spinner"></div>
-            <div>\${text}</div>
-          </div>
-        \`;
+    function openUrl(url) {
+      // In webview, post message to extension to open external URI
+      vscode.postMessage({
+        command: 'openUrl',
+        url: url
+      });
+    }
+
+    function renderHistory(history) {
+      const quickActions = document.getElementById('quick-actions-panel');
+      
+      // Remove thinking bubble before rendering history
+      toggleThinking(false);
+
+      if (history && history.length > 0) {
+        if (quickActions) {
+          quickActions.style.display = 'none';
+        }
+        
+        // Save current thinking state
+        chatPanel.innerHTML = '';
+        history.forEach(msg => {
+          const bubble = document.createElement('div');
+          bubble.className = 'bubble ' + (msg.role === 'user' ? 'user' : 'assistant');
+          if (msg.isHtml) {
+            bubble.innerHTML = msg.content;
+          } else {
+            // Very basic markdown translation for ticks and code blocks
+            bubble.innerHTML = formatMessageText(msg.content);
+          }
+          chatPanel.appendChild(bubble);
+        });
+      } else {
+        chatPanel.innerHTML = '';
+        if (quickActions) {
+          quickActions.style.display = 'flex';
+          chatPanel.appendChild(quickActions);
+        }
+      }
+      chatPanel.scrollTop = chatPanel.scrollHeight;
+    }
+
+    function formatMessageText(text) {
+      // Escape HTML
+      let escaped = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+      // Translate code blocks ```code```
+      escaped = escaped.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+      // Translate inline code `code`
+      escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+      
+      // Parse markdown links [text](url)
+      escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a class="github-link" onclick="openUrl(\'$2\')">$1</a>');
+
+      return escaped.replace(/\n/g, '<br/>');
+    }
+
+    function toggleThinking(visible) {
+      const existing = document.getElementById('thinking-bubble');
+      if (visible && !existing) {
+        const bubble = document.createElement('div');
+        bubble.id = 'thinking-bubble';
+        bubble.className = 'bubble thinking';
+        bubble.innerHTML = `
+          <span>Thinking</span>
+          <span class="thinking-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+        `;
+        chatPanel.appendChild(bubble);
+        chatPanel.scrollTop = chatPanel.scrollHeight;
+      } else if (!visible && existing) {
+        existing.remove();
       }
     }
 
-    function renderResult(content, title) {
-      const panel = document.getElementById('results-panel');
-      let header = title ? \`<h3 style="margin-top:0;">\${title}</h3>\` : '';
-      panel.innerHTML = \`<div class="ai-output">\${header}\${content}</div>\`;
+    function appendError(msg) {
+      toggleThinking(false);
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble assistant';
+      bubble.style.borderColor = '#f48771';
+      bubble.style.background = 'rgba(244,135,113,0.05)';
+      bubble.innerHTML = `<span style="color:#f48771; font-weight:600;">Error:</span> ${msg}`;
+      chatPanel.appendChild(bubble);
+      chatPanel.scrollTop = chatPanel.scrollHeight;
     }
 
-    function renderError(message) {
-      const panel = document.getElementById('results-panel');
-      panel.innerHTML = \`
-        <div style="color: #f48771; padding: 12px; background: rgba(244,135,113,0.1); border-radius: 8px; border: 1px solid rgba(244,135,113,0.2);">
-          <strong style="display:block; margin-bottom: 4px;">Error Occurred:</strong>
-          \${message}
-        </div>
-      \`;
-    }
-
-    function renderChatHistory(history) {
-      const chatPanel = document.getElementById('chat-history-panel');
-      chatPanel.innerHTML = '';
-      if (!history || history.length === 0) return;
-
-      history.forEach(msg => {
-        const bubble = document.createElement('div');
-        bubble.className = 'chat-bubble ' + (msg.role === 'user' ? 'user' : 'assistant');
-        bubble.innerText = msg.content;
-        chatPanel.appendChild(bubble);
-      });
-      
-      // Auto scroll chat to bottom
+    function appendResult(content, title) {
+      // Legacy commands display compatibility inside bubble
+      toggleThinking(false);
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble assistant';
+      let titleHtml = title ? `<h4 style="margin: 0 0 6px 0; border-bottom: 1px solid var(--border-color); padding-bottom:4px;">${title}</h4>` : '';
+      bubble.innerHTML = `${titleHtml}${content}`;
+      chatPanel.appendChild(bubble);
       chatPanel.scrollTop = chatPanel.scrollHeight;
     }
   </script>
