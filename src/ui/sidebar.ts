@@ -31,6 +31,9 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(data => {
       this._onAction(data);
     });
+
+    // Notify extension that webview is resolved and ready to receive state
+    this._onAction({ command: 'webviewReady' });
   }
 
   public updateStatus(statusText: string, isError: boolean = false): void {

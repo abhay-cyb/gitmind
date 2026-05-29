@@ -87,6 +87,10 @@ export async function activate(context: vscode.ExtensionContext) {
         await vscode.commands.executeCommand('gitmind.connectGitHub');
         break;
 
+      case 'webviewReady':
+        await startBackgroundScan(context, sidebarProvider);
+        break;
+
       case 'saveGeminiKey':
         if ((action as any).key) {
           try {
