@@ -8,6 +8,7 @@ import { isGitRepository } from '../git/status';
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  isHtml?: boolean;
 }
 
 export async function explainChangesCommand(
@@ -56,7 +57,8 @@ export async function explainChangesCommand(
     }
     chatHistory.push({
       role: 'assistant',
-      content: `<span style="color: #f48771; font-weight:600;">Error:</span> ${e.message || e}`
+      content: `<span style="color: #f48771; font-weight:600;">Error:</span> ${e.message || e}`,
+      isHtml: true
     });
     sidebarProvider.updateChat(chatHistory);
   }

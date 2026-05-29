@@ -699,7 +699,8 @@ async function handleChatQuery(
       // 4. If unknown, run standard AI explain changes command
       const legacyHistory: ChatMessage[] = chatHistory.map(h => ({
         role: h.role,
-        content: h.content
+        content: h.content,
+        isHtml: h.isHtml
       }));
 
       // Directly invoke explainChangesCommand
@@ -710,7 +711,8 @@ async function handleChatQuery(
       legacyHistory.forEach(h => {
         chatHistory.push({
           role: h.role,
-          content: h.content
+          content: h.content,
+          isHtml: h.isHtml
         });
       });
     }
