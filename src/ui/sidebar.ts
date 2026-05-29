@@ -534,6 +534,26 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
           // Existing commands legacy fallback compatibility
           appendResult(message.content, message.title);
           break;
+
+        case 'githubResult':
+          toggleThinking(false);
+          const resBubble = document.createElement('div');
+          resBubble.className = 'bubble assistant';
+          resBubble.innerHTML = message.text;
+          chatPanel.appendChild(resBubble);
+          chatPanel.scrollTop = chatPanel.scrollHeight;
+          break;
+
+        case 'githubError':
+          toggleThinking(false);
+          const errBubble = document.createElement('div');
+          errBubble.className = 'bubble assistant';
+          errBubble.style.borderColor = '#f48771';
+          errBubble.style.background = 'rgba(244,135,113,0.05)';
+          errBubble.innerHTML = '<span style="color:#f48771; font-weight:600;">GitHub Error:</span> ' + message.text;
+          chatPanel.appendChild(errBubble);
+          chatPanel.scrollTop = chatPanel.scrollHeight;
+          break;
       }
     });
 
