@@ -1,32 +1,3 @@
-export class GitHubError extends Error {
-  constructor(public readonly status: number, message: string) {
-    super(message);
-    this.name = 'GitHubError';
-  }
-}
-
-export interface GitHubRepo {
-  name: string;
-  url: string;
-  defaultBranch: string;
-}
-
-export interface GitHubPR {
-  url: string;
-  number: number;
-}
-
-export interface GitHubIssue {
-  number: number;
-  title: string;
-  state: string;
-}
-
-export interface GitHubUser {
-  login: string;
-  name: string;
-}
-
 export class GitHubClient {
   constructor(private readonly token: string) {}
 
@@ -34,11 +5,10 @@ export class GitHubClient {
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.token}`,
       'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'GitMind-VSCode-Extension'
+      'X-GitHub-Api-Version': '2022-11-28'
     };
 
-    if (options.body) {
+    if (options.body || options.method === 'POST' || options.method === 'PUT') {
       headers['Content-Type'] = 'application/json';
     }
 
@@ -54,27 +24,19 @@ export class GitHubClient {
 
     if (!res.ok) {
       const status = res.status;
-      let errorText = '';
-      try {
-        const errJson = await res.json() as any;
-        errorText = errJson?.message || '';
-      } catch (e) {}
-
-      // friendly mappings as required in Section 6
       if (status === 401) {
-        throw new GitHubError(401, "GitHub token expired or invalid. Run 'GitMind: Connect GitHub Account' to reconnect.");
+        throw new Error('GITHUB_UNAUTHORIZED');
       }
       if (status === 403) {
-        throw new GitHubError(403, "You don't have permission for this action on this repo.");
+        throw new Error('GITHUB_FORBIDDEN');
       }
       if (status === 404) {
-        throw new GitHubError(404, "Repo or resource not found. Check the name and try again.");
+        throw new Error('GITHUB_NOT_FOUND');
       }
       if (status === 422) {
-        throw new GitHubError(422, `GitHub rejected this action. ${errorText || 'The branch or PR may already exist.'}`);
+        throw new Error('GITHUB_UNPROCESSABLE');
       }
-
-      throw new GitHubError(status, errorText || `GitHub API error: ${res.statusText}`);
+      throw new Error(`GitHub API error: ${res.statusText}`);
     }
 
     if (res.status === 204) {
@@ -84,7 +46,7 @@ export class GitHubClient {
     return await res.json() as T;
   }
 
-  public async getAuthenticatedUser(): Promise<GitHubUser> {
+  public async getAuthenticatedUser(): Promise<{ login: string; name: string }> {
     const data = await this.request<any>('https://api.github.com/user');
     return {
       login: data.login,
@@ -92,13 +54,24 @@ export class GitHubClient {
     };
   }
 
-  public async createRepo(name: string, description?: string, isPrivate: boolean = false): Promise<{ url: string; cloneUrl: string }> {
+  public async listRepos(): Promise<Array<{ name: string; fullName: string; url: string; private: boolean }>> {
+    const data = await this.request<any[]>('https://api.github.com/user/repos?sort=updated&per_page=20');
+    return data.map(repo => ({
+      name: repo.name,
+      fullName: repo.full_name,
+      url: repo.html_url,
+      private: repo.private
+    }));
+  }
+
+  public async createRepo(name: string, description: string, isPrivate: boolean): Promise<{ url: string; cloneUrl: string }> {
     const data = await this.request<any>('https://api.github.com/user/repos', {
       method: 'POST',
       body: JSON.stringify({
         name,
-        description: description || '',
-        private: isPrivate
+        description,
+        private: isPrivate,
+        auto_init: true
       })
     });
     return {
@@ -107,27 +80,18 @@ export class GitHubClient {
     };
   }
 
-  public async listRepos(): Promise<GitHubRepo[]> {
-    const data = await this.request<any[]>('https://api.github.com/user/repos?sort=updated&per_page=20');
-    return data.map(repo => ({
-      name: repo.name,
-      url: repo.html_url,
-      defaultBranch: repo.default_branch
-    }));
-  }
-
-  public async createBranch(owner: string, repo: string, branchName: string, fromBranch: string): Promise<void> {
-    // 1. Get SHA of base branch
+  public async createBranch(owner: string, repo: string, newBranch: string, fromBranch: string): Promise<void> {
+    // Step 1: GET https://api.github.com/repos/{owner}/{repo}/git/refs/heads/{fromBranch}
     const refData = await this.request<any>(
       `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${fromBranch}`
     );
     const sha = refData.object.sha;
 
-    // 2. Create new reference
+    // Step 2: POST https://api.github.com/repos/{owner}/{repo}/git/refs
     await this.request<any>(`https://api.github.com/repos/${owner}/${repo}/git/refs`, {
       method: 'POST',
       body: JSON.stringify({
-        ref: `refs/heads/${branchName}`,
+        ref: `refs/heads/${newBranch}`,
         sha
       })
     });
@@ -140,7 +104,7 @@ export class GitHubClient {
     body: string,
     head: string,
     base: string
-  ): Promise<GitHubPR> {
+  ): Promise<{ url: string; number: number }> {
     const data = await this.request<any>(`https://api.github.com/repos/${owner}/${repo}/pulls`, {
       method: 'POST',
       body: JSON.stringify({
@@ -159,16 +123,18 @@ export class GitHubClient {
   public async mergePullRequest(owner: string, repo: string, prNumber: number): Promise<void> {
     await this.request<any>(`https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/merge`, {
       method: 'PUT',
-      body: JSON.stringify({})
+      body: JSON.stringify({
+        merge_method: "merge"
+      })
     });
   }
 
-  public async createIssue(owner: string, repo: string, title: string, body?: string): Promise<{ url: string; number: number }> {
+  public async createIssue(owner: string, repo: string, title: string, body: string): Promise<{ url: string; number: number }> {
     const data = await this.request<any>(`https://api.github.com/repos/${owner}/${repo}/issues`, {
       method: 'POST',
       body: JSON.stringify({
         title,
-        body: body || ''
+        body
       })
     });
     return {
@@ -177,15 +143,15 @@ export class GitHubClient {
     };
   }
 
-  public async listIssues(owner: string, repo: string): Promise<GitHubIssue[]> {
+  public async listIssues(owner: string, repo: string): Promise<Array<{ number: number; title: string; state: string; url: string }>> {
     const data = await this.request<any[]>(`https://api.github.com/repos/${owner}/${repo}/issues?state=open`);
-    // Issues endpoint also returns pull requests, filter them out if html_url contains "/pull/"
     return data
       .filter(item => !item.pull_request)
       .map(issue => ({
         number: issue.number,
         title: issue.title,
-        state: issue.state
+        state: issue.state,
+        url: issue.html_url
       }));
   }
 
@@ -197,7 +163,6 @@ export class GitHubClient {
     commitMessage: string
   ): Promise<void> {
     for (const file of files) {
-      // 1. Get SHA if file exists
       let sha: string | undefined;
       try {
         const fileData = await this.request<any>(
@@ -205,13 +170,11 @@ export class GitHubClient {
         );
         sha = fileData.sha;
       } catch (e: any) {
-        // 404 is expected if the file does not exist yet
-        if (e.status !== 404) {
+        if (e.message !== 'GITHUB_NOT_FOUND') {
           throw e;
         }
       }
 
-      // 2. Put file content
       const base64Content = Buffer.from(file.content, 'utf8').toString('base64');
       await this.request<any>(`https://api.github.com/repos/${owner}/${repo}/contents/${file.path}`, {
         method: 'PUT',
