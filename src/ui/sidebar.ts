@@ -51,6 +51,12 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  public updateGeminiStatus(hasKey: boolean): void {
+    if (this._view) {
+      this._view.webview.postMessage({ type: 'geminiStatus', hasKey });
+    }
+  }
+
   public showResult(resultHtml: string, title?: string): void {
     if (this._view) {
       this._view.webview.postMessage({ type: 'result', content: resultHtml, title });
