@@ -62,7 +62,7 @@ ${this.githubCache.reposText}`;
           const client = new GitHubClient(githubToken);
           const user = await client.getAuthenticatedUser();
           const repos = await client.listRepos();
-          const reposText = repos.map(r => `- ${r.fullName} (Private: ${r.private ? 'yes' : 'no'}, URL: ${r.url})`).join('\n');
+          const reposText = repos.map(r => `- ${r.fullName} (Private: ${r.private ? 'yes' : 'no'}, Created At: ${r.createdAt}, Updated At: ${r.updatedAt}, URL: ${r.url})`).join('\n');
           
           this.githubCache = {
             username: user.login,
