@@ -85,10 +85,10 @@ export async function activate(context: vscode.ExtensionContext) {
         break;
 
       case 'saveGeminiKey':
-        if (action.key) {
+        if ((action as any).key) {
           try {
-            await GeminiClient.complete(action.key, 'gemini-2.0-flash', 'You are a helpful assistant.', 'Hi');
-            await AIProvider.setApiKey(context, action.key);
+            await GeminiClient.complete((action as any).key, 'gemini-2.0-flash', 'You are a helpful assistant.', 'Hi');
+            await AIProvider.setApiKey(context, (action as any).key);
             showInfo('Gemini API Key saved ✓');
             await startBackgroundScan(context, sidebarProvider);
           } catch (e: any) {
@@ -98,11 +98,11 @@ export async function activate(context: vscode.ExtensionContext) {
         break;
 
       case 'saveGitHubTokenFromSettings':
-        if (action.token) {
+        if ((action as any).token) {
           try {
-            const client = new GitHubClient(action.token);
+            const client = new GitHubClient((action as any).token);
             const user = await client.getAuthenticatedUser();
-            await context.secrets.store('gitmind.githubToken', action.token);
+            await context.secrets.store('gitmind.githubToken', (action as any).token);
             showInfo(`Connected to GitHub as @${user.login} ✓`);
             await startBackgroundScan(context, sidebarProvider);
           } catch (e: any) {
