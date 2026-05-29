@@ -554,8 +554,8 @@ async function handleChatQuery(
     const githubToken = await context.secrets.get('gitmind.githubToken');
     const intent = parseGitHubIntent(query);
 
-    // 3. Process GitHub commands if matched
-    if (intent.action !== 'unknown') {
+    // 3. Process GitHub commands if matched (Bypass read actions like list_repos/list_issues so Gemini handles them conversationally)
+    if (intent.action !== 'unknown' && intent.action !== 'list_repos' && intent.action !== 'list_issues') {
       if (!githubToken) {
         sidebarProvider.setThinking(false);
         chatHistory.push({
@@ -586,25 +586,7 @@ async function handleChatQuery(
           break;
         }
 
-        case 'list_repos': {
-          const repos = await client.listRepos();
-          if (repos.length === 0) {
-            chatHistory.push({
-              role: 'assistant',
-              content: 'No repositories found.'
-            });
-          } else {
-            const listHtml = repos
-              .map(r => `• <a class="github-link" onclick="openUrl('${r.url}')">${r.fullName}</a> (Private: ${r.private ? 'yes' : 'no'})`)
-              .join('<br/>');
-            chatHistory.push({
-              role: 'assistant',
-              content: `<strong>Your active repositories:</strong><br/>${listHtml}`,
-              isHtml: true
-            });
-          }
-          break;
-        }
+
 
         case 'create_branch': {
           const branchName = intent.params.name || intent.params.to;
@@ -685,29 +667,7 @@ async function handleChatQuery(
           break;
         }
 
-        case 'list_issues': {
-          const remote = await getGitRemoteOwnerRepo();
-          if (!remote) {
-            throw new Error('No GitHub remote origin configured in local git repository.');
-          }
-          const issues = await client.listIssues(remote.owner, remote.repo);
-          if (issues.length === 0) {
-            chatHistory.push({
-              role: 'assistant',
-              content: 'No open issues found for this repository.'
-            });
-          } else {
-            const listHtml = issues
-              .map(i => `• <a class="github-link" onclick="openUrl('${i.url}')">#${i.number}</a>: ${i.title}`)
-              .join('<br/>');
-            chatHistory.push({
-              role: 'assistant',
-              content: `<strong>Open issues in ${remote.owner}/${remote.repo}:</strong><br/>${listHtml}`,
-              isHtml: true
-            });
-          }
-          break;
-        }
+
       }
     } else {
       // 4. If unknown, run standard AI explain changes command

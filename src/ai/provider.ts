@@ -3,7 +3,16 @@ import { GeminiClient } from './gemini';
 import { getSystemPrompt } from './prompts';
 import { ProjectMemory } from '../storage/projectMemory';
 
+import { GitHubClient } from '../github/githubClient';
+
 export class AIProvider {
+  private static githubCache: {
+    username: string;
+    name: string;
+    reposText: string;
+    timestamp: number;
+  } | null = null;
+
   public static async getApiKey(context: vscode.ExtensionContext): Promise<string | undefined> {
     return await context.secrets.get('gitmind.geminiApiKey');
   }
@@ -40,10 +49,38 @@ export class AIProvider {
     const projectContext = ProjectMemory.readContext() || 'No project context available.';
     let systemPrompt = getSystemPrompt(projectContext, options?.isBreakingCommitAnalysis);
 
-    // Retrieve cached GitHub username and append to systemPrompt
-    const githubUsername = context.globalState.get<string>('gitmind.githubUsername');
-    if (githubUsername) {
-      systemPrompt += `\n\nActive GitHub Connection: Connected as user @${githubUsername}. You can answer questions about the user's identity using this username.`;
+    // Fetch and cache user GitHub profile & repositories
+    const githubToken = await context.secrets.get('gitmind.githubToken');
+    if (githubToken) {
+      const now = Date.now();
+      if (this.githubCache && (now - this.githubCache.timestamp < 30000)) {
+        systemPrompt += `\n\nGitHub Profile: Connected as @${this.githubCache.username} (${this.githubCache.name})
+GitHub Repositories (sorted by last updated, newest first):
+${this.githubCache.reposText}`;
+      } else {
+        try {
+          const client = new GitHubClient(githubToken);
+          const user = await client.getAuthenticatedUser();
+          const repos = await client.listRepos();
+          const reposText = repos.map(r => `- ${r.fullName} (Private: ${r.private ? 'yes' : 'no'}, URL: ${r.url})`).join('\n');
+          
+          this.githubCache = {
+            username: user.login,
+            name: user.name,
+            reposText,
+            timestamp: now
+          };
+
+          systemPrompt += `\n\nGitHub Profile: Connected as @${user.login} (${user.name})
+GitHub Repositories (sorted by last updated, newest first):
+${reposText}`;
+
+          await context.globalState.update('gitmind.githubUsername', user.login);
+        } catch (e) {
+          this.githubCache = null;
+          await context.globalState.update('gitmind.githubUsername', undefined);
+        }
+      }
     }
 
     // Retrieve cached git repository details and append to systemPrompt
