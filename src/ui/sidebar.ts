@@ -620,21 +620,18 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
   <!-- Settings Panel -->
   <div id="settings-panel" class="settings-panel" style="display: none;">
     <div class="settings-section">
-      <h3>Gemini API Key</h3>
+      <h3>Gemini API Connection</h3>
       <div id="settings-gemini-connected" style="display: none;">
-        <p class="connected-user" style="margin-bottom: 8px;">Key Status: <strong style="color: #4ec9b0;">Saved ✓</strong></p>
-        <div class="settings-row-input">
-          <input type="password" id="settings-gemini-key-change" placeholder="Update Gemini API Key..." />
-          <button class="settings-btn" onclick="saveGeminiKeyFromSettings('settings-gemini-key-change')">Update</button>
-        </div>
+        <p class="connected-user">Connected ✓</p>
+        <button class="settings-btn disconnect-btn" onclick="disconnectGeminiFromSettings()">Disconnect Gemini</button>
       </div>
       <div id="settings-gemini-disconnected">
         <div class="settings-row-input">
           <input type="password" id="settings-gemini-key" placeholder="Paste Gemini API Key..." />
-          <button class="settings-btn" onclick="saveGeminiKeyFromSettings('settings-gemini-key')">Save</button>
+          <button class="settings-btn" onclick="saveGeminiKeyFromSettings('settings-gemini-key')">Connect</button>
         </div>
+        <p class="settings-note">Get a key at <span class="github-link" onclick="openUrl('https://aistudio.google.com/')">Google AI Studio</span></p>
       </div>
-      <p class="settings-note">Get a key at <span class="github-link" onclick="openUrl('https://aistudio.google.com/')">Google AI Studio</span></p>
     </div>
 
     <div class="settings-section">
@@ -1012,6 +1009,12 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
     function disconnectGitHubFromSettings() {
       vscode.postMessage({
         command: 'disconnectGitHub'
+      });
+    }
+
+    function disconnectGeminiFromSettings() {
+      vscode.postMessage({
+        command: 'disconnectGemini'
       });
     }
   </script>

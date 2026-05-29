@@ -18,7 +18,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Sidebar webview resolution and callback actions
   const sidebarProvider = new GitMindSidebarProvider(context.extensionUri, async (action) => {
     // Graceful degradation check: Verify git repo for repository-specific commands
-    const repoCommands = ['findBreakingCommit', 'explainConflict', 'refreshContext', 'chatQuery', 'githubAction'];
+    const repoCommands = ['findBreakingCommit', 'explainConflict', 'refreshContext'];
     if (repoCommands.includes(action.command)) {
       const hasGit = await isGitRepository();
       if (!hasGit) {
@@ -128,6 +128,13 @@ export async function activate(context: vscode.ExtensionContext) {
         await context.secrets.delete('gitmind.githubToken');
         showInfo('GitHub account disconnected.');
         sidebarProvider.updateGitHubStatus(null);
+        break;
+
+      case 'disconnectGemini':
+        await context.secrets.delete('gitmind.geminiApiKey');
+        showInfo('Gemini account disconnected.');
+        sidebarProvider.updateGeminiStatus(false);
+        sidebarProvider.updateStatus('API Key missing ⚠', true);
         break;
 
       case 'openUrl':

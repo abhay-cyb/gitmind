@@ -3,6 +3,7 @@ import { getCommitsFiltered, LogFilterOptions } from '../git/log';
 import { AIProvider } from '../ai/provider';
 import { getChangeSummarizerPrompt } from '../ai/prompts';
 import { GitMindSidebarProvider } from '../ui/sidebar';
+import { isGitRepository } from '../git/status';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -15,16 +16,23 @@ export async function explainChangesCommand(
   sidebarProvider: GitMindSidebarProvider,
   chatHistory: ChatMessage[]
 ): Promise<void> {
-  sidebarProvider.setLoader(true, 'Reading git logs for your query...');
-
   try {
-    const filterOptions = parseQuery(query);
-    const commits = await getCommitsFiltered(filterOptions);
+    const hasGit = await isGitRepository();
+    const isGitQuery = /commit|change|diff|log|history|yesterday|today|week|day|what's new|added|fixed/i.test(query);
 
-    sidebarProvider.setLoader(true, 'Summarizing changes...');
+    let response: string;
 
-    const userPrompt = getChangeSummarizerPrompt(query, commits);
-    const response = await AIProvider.callAI(context, userPrompt);
+    if (hasGit && isGitQuery) {
+      sidebarProvider.setLoader(true, 'Reading git logs for your query...');
+      const filterOptions = parseQuery(query);
+      const commits = await getCommitsFiltered(filterOptions);
+      sidebarProvider.setLoader(true, 'Summarizing changes...');
+      const userPrompt = getChangeSummarizerPrompt(query, commits);
+      response = await AIProvider.callAI(context, userPrompt);
+    } else {
+      sidebarProvider.setLoader(true, 'Thinking...');
+      response = await AIProvider.callAI(context, query);
+    }
 
     // Keep last 5 exchanges (10 messages total: 5 user, 5 assistant)
     chatHistory.push({ role: 'user', content: query });
