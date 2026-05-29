@@ -90,12 +90,18 @@ export async function activate(context: vscode.ExtensionContext) {
       case 'saveGeminiKey':
         if ((action as any).key) {
           try {
-            await GeminiClient.complete((action as any).key, 'gemini-2.0-flash', 'You are a helpful assistant.', 'Hi');
+            await GeminiClient.complete((action as any).key, 'gemini-3.5-flash', 'You are a helpful assistant.', 'Hi');
             await AIProvider.setApiKey(context, (action as any).key);
             showInfo('Gemini API Key saved ✓');
             await startBackgroundScan(context, sidebarProvider);
           } catch (e: any) {
-            showError(`Gemini validation failed: ${e.message || e}`);
+            if (e.message.includes('rate limit') || e.message.includes('429') || e.message.includes('Quota')) {
+              await AIProvider.setApiKey(context, (action as any).key);
+              showInfo('Gemini API Key saved ✓ (Quota rate limit warning)');
+              await startBackgroundScan(context, sidebarProvider);
+            } else {
+              showError(`Gemini validation failed: ${e.message || e}`);
+            }
           }
         }
         break;
@@ -226,12 +232,16 @@ export async function activate(context: vscode.ExtensionContext) {
       });
       if (key) {
         try {
-          await GeminiClient.complete(key, 'gemini-2.0-flash', 'You are a helpful assistant.', 'Hi');
+          await GeminiClient.complete(key, 'gemini-3.5-flash', 'You are a helpful assistant.', 'Hi');
           await AIProvider.setApiKey(context, key);
           showInfo('Gemini API Key saved ✓');
           await startBackgroundScan(context, sidebarProvider);
         } catch (e: any) {
-          if (e.message.includes('API key') || e.message.includes('403') || e.message.includes('Key')) {
+          if (e.message.includes('rate limit') || e.message.includes('429') || e.message.includes('Quota')) {
+            await AIProvider.setApiKey(context, key);
+            showInfo('Gemini API Key saved ✓ (Quota rate limit warning)');
+            await startBackgroundScan(context, sidebarProvider);
+          } else if (e.message.includes('API key') || e.message.includes('403') || e.message.includes('Key')) {
             showError('Invalid key. Please check and try again.');
           } else {
             showError(e.message || 'Validation failed.');

@@ -15,7 +15,7 @@ export class AIProvider {
   public static getSelectedModel(): string {
     return vscode.workspace
       .getConfiguration('gitmind')
-      .get<string>('geminiModel', 'gemini-2.0-flash');
+      .get<string>('geminiModel', 'gemini-3.5-flash');
   }
 
   public static async setSelectedModel(model: string): Promise<void> {
