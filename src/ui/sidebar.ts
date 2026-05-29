@@ -221,6 +221,19 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       gap: 12px;
       background: var(--bg-main);
     }
+    .chat-messages::-webkit-scrollbar,
+    .settings-panel::-webkit-scrollbar {
+      width: 4px;
+    }
+    .chat-messages::-webkit-scrollbar-track,
+    .settings-panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .chat-messages::-webkit-scrollbar-thumb,
+    .settings-panel::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 2px;
+    }
 
     /* Message Bubbles */
     .bubble {
@@ -337,54 +350,71 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
     .quick-actions {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 16px;
       padding: 20px 10px;
       margin: auto 0;
       align-items: center;
+      width: 100%;
+      box-sizing: border-box;
       animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
     .welcome-text {
       text-align: center;
       color: var(--text-muted);
-      margin-bottom: 16px;
       font-size: 0.95em;
+    }
+
+    .quick-actions-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      width: 100%;
+      max-width: 280px;
     }
 
     .action-btn {
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       color: var(--text-main);
-      padding: 10px 14px;
-      border-radius: 6px;
+      padding: 16px 10px;
+      border-radius: 12px;
       cursor: pointer;
-      width: 85%;
-      text-align: left;
       font-weight: 500;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 10px;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      justify-content: center;
+      text-align: center;
+      gap: 8px;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .action-btn:hover {
       border-color: #ffffff;
-      background: rgba(255,255,255,0.02);
-      transform: translateY(-1px);
+      background: rgba(255,255,255,0.03);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(255,255,255,0.05);
     }
 
     .action-icon {
-      font-size: 1.2em;
+      font-size: 1.4em;
+    }
+
+    .action-text {
+      font-size: 0.85em;
+      line-height: 1.25;
     }
 
     /* Fixed Input Box at Bottom */
     .input-container {
       background: var(--bg-card);
       border-top: 1px solid var(--border-color);
-      padding: 10px;
+      padding: 12px 12px 20px 12px;
       flex-shrink: 0;
       display: flex;
       gap: 8px;
-      align-items: flex-end;
+      align-items: center;
+      box-sizing: border-box;
     }
 
     .chat-input {
@@ -412,19 +442,20 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       background: #ffffff;
       color: #09090b;
       border: none;
-      border-radius: 18px;
-      padding: 8px 14px;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      padding: 0;
       cursor: pointer;
-      font-weight: 600;
       display: flex;
       align-items: center;
       justify-content: center;
-      height: 32px;
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .send-btn:hover {
       background: #e4e4e7;
-      transform: translateY(-1px);
+      transform: scale(1.05);
     }
 
     /* Links inside assistant bubbles */
@@ -539,9 +570,19 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
   <!-- Header -->
   <div class="header">
     <div class="header-top">
-      <div class="brand-title">🧠 GitMind V2</div>
+      <div class="brand-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #ffffff;">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+        </svg>
+        <span>GitMind V2</span>
+      </div>
       <div style="display: flex; align-items: center; gap: 8px;">
-        <button id="settings-toggle-btn" class="icon-btn" onclick="toggleSettings()" title="Settings">⚙</button>
+        <button id="settings-toggle-btn" class="icon-btn" onclick="toggleSettings()" title="Settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
         <div id="scan-badge" class="status-badge ready">Checking...</div>
       </div>
     </div>
@@ -600,32 +641,39 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
     <div class="quick-actions" id="quick-actions-panel">
       <div class="welcome-text">Select a quick action or type a command below.</div>
       
-      <button class="action-btn" onclick="findBreakingCommit()">
-        <span class="action-icon">🔍</span>
-        <span>Find Breaking Commit</span>
-      </button>
-      
-      <button class="action-btn" onclick="explainConflict()">
-        <span class="action-icon">⚡</span>
-        <span>Explain Conflict</span>
-      </button>
+      <div class="quick-actions-grid">
+        <button class="action-btn" onclick="findBreakingCommit()">
+          <span class="action-icon">🔍</span>
+          <span class="action-text">Find Breaking Commit</span>
+        </button>
+        
+        <button class="action-btn" onclick="explainConflict()">
+          <span class="action-icon">⚡</span>
+          <span class="action-text">Explain Conflict</span>
+        </button>
 
-      <button class="action-btn" onclick="listRepos()">
-        <span class="action-icon">📋</span>
-        <span>List My Repos</span>
-      </button>
+        <button class="action-btn" onclick="listRepos()">
+          <span class="action-icon">📋</span>
+          <span class="action-text">List My Repos</span>
+        </button>
 
-      <button class="action-btn" onclick="connectGitHub()">
-        <span class="action-icon">🔗</span>
-        <span>Connect GitHub</span>
-      </button>
+        <button class="action-btn" onclick="connectGitHub()">
+          <span class="action-icon">🔗</span>
+          <span class="action-text">Connect GitHub</span>
+        </button>
+      </div>
     </div>
   </div>
 
   <!-- Input Area -->
   <div class="input-container">
     <textarea class="chat-input" id="chat-input" placeholder="Ask about git or run GitHub commands..." rows="1" onkeydown="handleInputKeyDown(event)"></textarea>
-    <button class="send-btn" onclick="submitMessage()">Send</button>
+    <button class="send-btn" onclick="submitMessage()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"></line>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+      </svg>
+    </button>
   </div>
 
   <script>
