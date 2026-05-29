@@ -96,36 +96,38 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
   <title>GitMind</title>
   <style>
     :root {
-      --gitmind-accent: var(--vscode-button-background, #8e2de2);
-      --gitmind-accent-hover: var(--vscode-button-hoverBackground, #4a00e0);
-      --gitmind-glow: rgba(142, 45, 226, 0.15);
-      --border-color: var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+      --gitmind-accent: #ffffff;
+      --gitmind-accent-hover: #e4e4e7;
+      --border-color: #27272a;
+      --bg-main: #09090b;
+      --bg-card: #18181b;
+      --text-main: #f4f4f5;
+      --text-muted: #a1a1aa;
     }
     
     body {
       padding: 0;
-      font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
-      color: var(--vscode-foreground);
-      background-color: var(--vscode-sideBar-background);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text-main);
+      background-color: var(--bg-main);
       margin: 0;
       display: flex;
       flex-direction: column;
       height: 100vh;
       box-sizing: border-box;
-      font-size: var(--vscode-font-size, 13px);
+      font-size: 13px;
       overflow: hidden;
     }
 
     /* Fixed Header */
     .header {
-      background: var(--vscode-sideBar-background);
+      background: var(--bg-card);
       border-bottom: 1px solid var(--border-color);
       padding: 12px;
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
       gap: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
       z-index: 10;
     }
 
@@ -137,13 +139,12 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
 
     .brand-title {
       font-weight: 700;
-      font-size: 1.15em;
+      font-size: 1.1em;
       display: flex;
       align-items: center;
       gap: 6px;
-      background: linear-gradient(90deg, #00f2fe, #8e2de2);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      color: #ffffff;
+      letter-spacing: -0.01em;
     }
 
     .status-row {
@@ -158,22 +159,23 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       align-items: center;
       gap: 4px;
       font-weight: 500;
+      font-size: 0.82em;
       padding: 2px 6px;
       border-radius: 4px;
-      background: rgba(255,255,255,0.04);
+      background: var(--bg-main);
       border: 1px solid var(--border-color);
     }
 
-    .status-badge.ready { color: #4ec9b0; }
-    .status-badge.scanning { color: #ce9178; }
-    .status-badge.error { color: #f48771; }
+    .status-badge.ready { color: var(--text-muted); }
+    .status-badge.scanning { color: #ffffff; }
+    .status-badge.error { color: #ff6b6b; }
 
     .github-status {
       display: inline-flex;
       align-items: center;
       gap: 5px;
       font-weight: 500;
-      color: var(--vscode-descriptionForeground);
+      color: var(--text-muted);
     }
 
     .github-dot {
@@ -181,11 +183,11 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       height: 6px;
       border-radius: 50%;
       display: inline-block;
-      background: #888888;
+      background: #52525b;
     }
     .github-dot.connected {
-      background: #4ec9b0;
-      box-shadow: 0 0 6px #4ec9b0;
+      background: #ffffff;
+      box-shadow: 0 0 6px #ffffff;
     }
 
     /* Model Select dropdown */
@@ -195,17 +197,18 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       gap: 4px;
     }
     select {
-      background: var(--vscode-dropdown-background);
-      color: var(--vscode-dropdown-foreground);
-      border: 1px solid var(--vscode-dropdown-border, rgba(255,255,255,0.15));
+      background: var(--bg-main);
+      color: #ffffff;
+      border: 1px solid var(--border-color);
       padding: 6px;
       border-radius: 4px;
       outline: none;
       cursor: pointer;
-      font-size: 0.95em;
+      font-size: 0.9em;
+      transition: border-color 0.2s;
     }
     select:focus {
-      border-color: var(--gitmind-accent);
+      border-color: #ffffff;
     }
 
     /* Scrollable Chat Area */
@@ -216,49 +219,48 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      background: var(--vscode-sideBar-background);
+      background: var(--bg-main);
     }
 
     /* Message Bubbles */
     .bubble {
       max-width: 85%;
       padding: 10px 12px;
-      border-radius: 12px;
-      line-height: 1.45;
+      border-radius: 8px;
+      line-height: 1.5;
       word-wrap: break-word;
-      animation: bubbleFadeIn 0.25s ease-out;
-      font-size: 0.95em;
+      animation: bubbleFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+      font-size: 0.92em;
     }
 
     @keyframes bubbleFadeIn {
-      from { opacity: 0; transform: translateY(8px); }
+      from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
     .bubble.user {
       align-self: flex-end;
-      background: var(--gitmind-accent);
-      color: var(--vscode-button-foreground, #ffffff);
-      border-bottom-right-radius: 2px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      background: #ffffff;
+      color: #09090b;
+      font-weight: 500;
+      border-bottom-right-radius: 1px;
     }
 
     .bubble.assistant {
       align-self: flex-start;
-      background: var(--vscode-editor-background);
-      color: var(--vscode-foreground);
-      border-bottom-left-radius: 2px;
+      background: var(--bg-card);
+      color: var(--text-main);
+      border-bottom-left-radius: 1px;
       border: 1px solid var(--border-color);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
     .bubble.thinking {
       align-self: flex-start;
-      background: var(--vscode-editor-background);
+      background: var(--bg-card);
       border: 1px solid var(--border-color);
-      border-bottom-left-radius: 2px;
+      border-bottom-left-radius: 1px;
       font-style: italic;
-      color: var(--vscode-descriptionForeground);
+      color: var(--text-muted);
       display: flex;
       align-items: center;
       gap: 8px;
@@ -271,7 +273,7 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
     .thinking-dots span {
       width: 5px;
       height: 5px;
-      background-color: var(--vscode-descriptionForeground);
+      background-color: var(--text-muted);
       border-radius: 50%;
       animation: pulse 1.4s infinite both;
     }
@@ -288,12 +290,12 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       background: rgba(255,255,255,0.06);
       padding: 2px 4px;
       border-radius: 4px;
-      font-family: var(--vscode-editor-font-family, monospace);
+      font-family: monospace;
       font-size: 0.9em;
     }
 
     .assistant pre {
-      background: rgba(0, 0, 0, 0.15);
+      background: #000000;
       border: 1px solid var(--border-color);
       border-radius: 6px;
       padding: 8px;
@@ -307,17 +309,17 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
 
     /* Risk indicators */
     .commit-card {
-      border-left: 4px solid var(--gitmind-accent);
-      background: rgba(255,255,255,0.02);
+      border-left: 3px solid #ffffff;
+      background: rgba(255,255,255,0.01);
       border-radius: 0 6px 6px 0;
       padding: 8px;
       margin: 8px 0;
       border: 1px solid var(--border-color);
-      border-left-width: 4px;
+      border-left-width: 3px;
     }
-    .commit-card.high { border-left-color: #f48771; }
-    .commit-card.medium { border-left-color: #dcdcaa; }
-    .commit-card.low { border-left-color: #4ec9b0; }
+    .commit-card.high { border-left-color: #ff6b6b; }
+    .commit-card.medium { border-left-color: #f1c40f; }
+    .commit-card.low { border-left-color: #a1a1aa; }
 
     .commit-header {
       display: flex;
@@ -326,7 +328,7 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       margin-bottom: 4px;
     }
     .commit-hash {
-      color: #569cd6;
+      color: #ffffff;
       cursor: pointer;
       text-decoration: underline;
     }
@@ -339,22 +341,22 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       padding: 20px 10px;
       margin: auto 0;
       align-items: center;
-      animation: fadeIn 0.4s ease-out;
+      animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
     .welcome-text {
       text-align: center;
-      color: var(--vscode-descriptionForeground);
+      color: var(--text-muted);
       margin-bottom: 16px;
       font-size: 0.95em;
     }
 
     .action-btn {
-      background: var(--vscode-editor-background);
+      background: var(--bg-card);
       border: 1px solid var(--border-color);
-      color: var(--vscode-foreground);
+      color: var(--text-main);
       padding: 10px 14px;
-      border-radius: 8px;
+      border-radius: 6px;
       cursor: pointer;
       width: 85%;
       text-align: left;
@@ -362,12 +364,11 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       display: flex;
       align-items: center;
       gap: 10px;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .action-btn:hover {
-      border-color: var(--gitmind-accent);
-      background: rgba(255,255,255,0.03);
+      border-color: #ffffff;
+      background: rgba(255,255,255,0.02);
       transform: translateY(-1px);
     }
 
@@ -377,23 +378,22 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
 
     /* Fixed Input Box at Bottom */
     .input-container {
-      background: var(--vscode-sideBar-background);
+      background: var(--bg-card);
       border-top: 1px solid var(--border-color);
       padding: 10px;
       flex-shrink: 0;
       display: flex;
       gap: 8px;
       align-items: flex-end;
-      box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
     }
 
     .chat-input {
       flex: 1;
-      background: var(--vscode-input-background);
-      color: var(--vscode-input-foreground);
-      border: 1px solid var(--vscode-input-border, rgba(255,255,255,0.15));
-      border-radius: 6px;
-      padding: 8px 10px;
+      background: var(--bg-main);
+      color: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      padding: 8px 14px;
       outline: none;
       resize: none;
       font-family: inherit;
@@ -402,32 +402,34 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       min-height: 20px;
       line-height: 1.4;
       box-sizing: border-box;
+      transition: border-color 0.2s;
     }
     .chat-input:focus {
-      border-color: var(--gitmind-accent);
+      border-color: #ffffff;
     }
 
     .send-btn {
-      background: var(--gitmind-accent);
-      color: var(--vscode-button-foreground, #ffffff);
+      background: #ffffff;
+      color: #09090b;
       border: none;
-      border-radius: 6px;
-      padding: 8px 12px;
+      border-radius: 18px;
+      padding: 8px 14px;
       cursor: pointer;
       font-weight: 600;
       display: flex;
       align-items: center;
       justify-content: center;
-      height: 34px;
-      transition: background-color 0.2s;
+      height: 32px;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .send-btn:hover {
-      background: var(--gitmind-accent-hover);
+      background: #e4e4e7;
+      transform: translateY(-1px);
     }
 
     /* Links inside assistant bubbles */
     .github-link {
-      color: #569cd6;
+      color: #ffffff;
       text-decoration: underline;
       cursor: pointer;
     }
@@ -435,9 +437,9 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
     .icon-btn {
       background: transparent;
       border: none;
-      color: var(--vscode-foreground);
+      color: #ffffff;
       cursor: pointer;
-      font-size: 1.25em;
+      font-size: 1.2em;
       padding: 2px 6px;
       border-radius: 4px;
       display: flex;
@@ -457,7 +459,7 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       display: flex;
       flex-direction: column;
       gap: 20px;
-      background: var(--vscode-sideBar-background);
+      background: var(--bg-main);
     }
     .settings-section {
       display: flex;
@@ -468,7 +470,7 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       margin: 0;
       font-size: 1em;
       font-weight: 600;
-      color: var(--vscode-foreground);
+      color: #ffffff;
     }
     .settings-row-input {
       display: flex;
@@ -476,52 +478,55 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
     }
     .settings-row-input input {
       flex: 1;
-      background: var(--vscode-input-background);
-      color: var(--vscode-input-foreground);
-      border: 1px solid var(--vscode-input-border, rgba(255,255,255,0.15));
-      border-radius: 4px;
-      padding: 6px 10px;
+      background: var(--bg-card);
+      color: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px 12px;
       outline: none;
-      font-size: 0.95em;
+      font-size: 0.92em;
+      transition: border-color 0.2s;
     }
     .settings-row-input input:focus {
-      border-color: var(--gitmind-accent);
+      border-color: #ffffff;
     }
     .settings-btn {
-      background: var(--gitmind-accent);
-      color: var(--vscode-button-foreground, #ffffff);
+      background: #ffffff;
+      color: #09090b;
       border: none;
-      border-radius: 4px;
-      padding: 6px 12px;
+      border-radius: 6px;
+      padding: 8px 14px;
       cursor: pointer;
       font-weight: 600;
-      font-size: 0.95em;
-      transition: background-color 0.2s;
+      font-size: 0.9em;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .settings-btn:hover {
-      background: var(--gitmind-accent-hover);
+      background: #e4e4e7;
+      transform: translateY(-1px);
     }
     .settings-btn.disconnect-btn {
-      background: #f48771;
+      background: #ff6b6b;
       color: #ffffff;
       width: 100%;
     }
     .settings-btn.disconnect-btn:hover {
-      background: #e06c54;
+      background: #ff4a4a;
     }
     .settings-btn.close-btn {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--vscode-foreground);
+      background: transparent;
+      color: var(--text-main);
       border: 1px solid var(--border-color);
       width: 100%;
     }
     .settings-btn.close-btn:hover {
-      background: rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      border-color: #ffffff;
     }
     .settings-note {
       margin: 0;
       font-size: 0.85em;
-      color: var(--vscode-descriptionForeground);
+      color: var(--text-muted);
     }
     .connected-user {
       margin: 4px 0 8px 0;
