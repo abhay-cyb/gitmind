@@ -17,12 +17,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Sidebar webview resolution and callback actions
   const sidebarProvider = new GitMindSidebarProvider(context.extensionUri, async (action) => {
-    // Graceful degradation check: Verify git repo
-    const hasGit = await isGitRepository();
-    if (!hasGit && action.command !== 'changeModel' && action.command !== 'connectGitHub') {
-      sidebarProvider.updateStatus('No git repo ⚠', true);
-      sidebarProvider.showError('Open a Git repository to use GitMind.');
-      return;
+    // Graceful degradation check: Verify git repo for repository-specific commands
+    const repoCommands = ['findBreakingCommit', 'explainConflict', 'refreshContext', 'chatQuery', 'githubAction'];
+    if (repoCommands.includes(action.command)) {
+      const hasGit = await isGitRepository();
+      if (!hasGit) {
+        sidebarProvider.updateStatus('No git repo ⚠', true);
+        sidebarProvider.showError('Open a Git repository to use GitMind.');
+        return;
+      }
     }
 
     switch (action.command) {
@@ -273,13 +276,7 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 async function startBackgroundScan(context: vscode.ExtensionContext, sidebarProvider: GitMindSidebarProvider): Promise<void> {
-  const hasGit = await isGitRepository();
-  if (!hasGit) {
-    sidebarProvider.updateStatus('No git repo ⚠', true);
-    return;
-  }
-
-  // Retrieve GitHub status
+  // Retrieve GitHub status first so it is always updated regardless of repository state
   const githubToken = await context.secrets.get('gitmind.githubToken');
   if (githubToken) {
     try {
@@ -291,6 +288,16 @@ async function startBackgroundScan(context: vscode.ExtensionContext, sidebarProv
     }
   } else {
     sidebarProvider.updateGitHubStatus(null);
+  }
+
+  // Update selected model in UI
+  const model = AIProvider.getSelectedModel();
+  sidebarProvider.updateModel(model);
+
+  const hasGit = await isGitRepository();
+  if (!hasGit) {
+    sidebarProvider.updateStatus('No git repo ⚠', true);
+    return;
   }
 
   sidebarProvider.updateStatus('Scanning... ⏳');
