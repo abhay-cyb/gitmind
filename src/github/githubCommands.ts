@@ -17,42 +17,44 @@ export function parseGitHubIntent(message: string): GitHubIntent {
   const lower = message.toLowerCase();
   const params: Record<string, string> = {};
 
+  const hasWord = (word: string) => new RegExp(`\\b${word}\\b`, 'i').test(lower);
+
   // 1. Parsing Rules
   let action: GitHubAction = 'unknown';
 
   if (
-    (lower.includes('create') || lower.includes('new') || lower.includes('make')) &&
-    (lower.includes('repo') || lower.includes('repository'))
+    (hasWord('create') || hasWord('new') || hasWord('make')) &&
+    (hasWord('repo') || hasWord('repository'))
   ) {
     action = 'create_repo';
   } else if (
-    (lower.includes('list') || lower.includes('show') || lower.includes('my')) &&
-    (lower.includes('repo') || lower.includes('repositories'))
+    (hasWord('list') || hasWord('show') || hasWord('my') || hasWord('newest') || hasWord('recent')) &&
+    (hasWord('repo') || hasWord('repos') || hasWord('repository') || hasWord('repositories'))
   ) {
     action = 'list_repos';
   } else if (
-    lower.includes('branch') &&
-    (lower.includes('create') || lower.includes('new') || lower.includes('make'))
+    hasWord('branch') &&
+    (hasWord('create') || hasWord('new') || hasWord('make'))
   ) {
     action = 'create_branch';
   } else if (
-    (lower.includes('pull request') || lower.includes(' pr ')) &&
+    (lower.includes('pull request') || hasWord('pr')) &&
     !lower.includes('merge')
   ) {
     action = 'create_pr';
   } else if (
     lower.includes('merge') &&
-    (lower.includes('pr') || lower.includes('pull request'))
+    (hasWord('pr') || lower.includes('pull request'))
   ) {
     action = 'merge_pr';
   } else if (
     lower.includes('issue') &&
-    (lower.includes('create') || lower.includes('new') || lower.includes('open'))
+    (hasWord('create') || hasWord('new') || hasWord('open'))
   ) {
     action = 'create_issue';
   } else if (
     lower.includes('issue') &&
-    (lower.includes('list') || lower.includes('show') || lower.includes('open'))
+    (hasWord('list') || hasWord('show') || hasWord('open'))
   ) {
     action = 'list_issues';
   }
