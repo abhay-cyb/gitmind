@@ -55,14 +55,48 @@ export class GitHubClient {
     };
   }
 
-  public async listRepos(): Promise<Array<{ name: string; fullName: string; url: string; private: boolean }>> {
-    const data = await this.request<any[]>('https://api.github.com/user/repos?sort=updated&per_page=20');
-    return data.map(repo => ({
-      name: repo.name,
-      fullName: repo.full_name,
-      url: repo.html_url,
-      private: repo.private
-    }));
+  public async listRepos(): Promise<Array<{ name: string; fullName: string; url: string; private: boolean; createdAt: string; updatedAt: string }>> {
+    try {
+      const [oldestData, newestData] = await Promise.all([
+        this.request<any[]>('https://api.github.com/user/repos?sort=created&direction=asc&per_page=100'),
+        this.request<any[]>('https://api.github.com/user/repos?sort=updated&direction=desc&per_page=100')
+      ]);
+
+      const repoMap = new Map<string, { name: string; fullName: string; url: string; private: boolean; createdAt: string; updatedAt: string }>();
+
+      const addRepos = (repos: any[]) => {
+        if (Array.isArray(repos)) {
+          repos.forEach(repo => {
+            if (repo && repo.full_name) {
+              repoMap.set(repo.full_name, {
+                name: repo.name,
+                fullName: repo.full_name,
+                url: repo.html_url,
+                private: repo.private,
+                createdAt: repo.created_at,
+                updatedAt: repo.updated_at
+              });
+            }
+          });
+        }
+      };
+
+      addRepos(oldestData);
+      addRepos(newestData);
+
+      return Array.from(repoMap.values());
+    } catch (e) {
+      // Fallback if parallel requests fail
+      const data = await this.request<any[]>('https://api.github.com/user/repos?sort=updated&per_page=100');
+      return data.map(repo => ({
+        name: repo.name,
+        fullName: repo.full_name,
+        url: repo.html_url,
+        private: repo.private,
+        createdAt: repo.created_at,
+        updatedAt: repo.updated_at
+      }));
+    }
   }
 
   public async createRepo(name: string, description: string, isPrivate: boolean): Promise<{ url: string; cloneUrl: string }> {
