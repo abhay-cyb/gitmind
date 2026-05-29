@@ -95,7 +95,7 @@ export async function activate(context: vscode.ExtensionContext) {
             showInfo('Gemini API Key saved ✓');
             await startBackgroundScan(context, sidebarProvider);
           } catch (e: any) {
-            showError('Invalid Gemini API Key. Please check and try again.');
+            showError(`Gemini validation failed: ${e.message || e}`);
           }
         }
         break;
