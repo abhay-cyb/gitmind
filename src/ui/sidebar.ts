@@ -618,9 +618,18 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
   <div id="settings-panel" class="settings-panel" style="display: none;">
     <div class="settings-section">
       <h3>Gemini API Key</h3>
-      <div class="settings-row-input">
-        <input type="password" id="settings-gemini-key" placeholder="Paste Gemini API Key..." />
-        <button class="settings-btn" onclick="saveGeminiKeyFromSettings()">Save</button>
+      <div id="settings-gemini-connected" style="display: none;">
+        <p class="connected-user" style="margin-bottom: 8px;">Key Status: <strong style="color: #4ec9b0;">Saved ✓</strong></p>
+        <div class="settings-row-input">
+          <input type="password" id="settings-gemini-key-change" placeholder="Update Gemini API Key..." />
+          <button class="settings-btn" onclick="saveGeminiKeyFromSettings('settings-gemini-key-change')">Update</button>
+        </div>
+      </div>
+      <div id="settings-gemini-disconnected">
+        <div class="settings-row-input">
+          <input type="password" id="settings-gemini-key" placeholder="Paste Gemini API Key..." />
+          <button class="settings-btn" onclick="saveGeminiKeyFromSettings('settings-gemini-key')">Save</button>
+        </div>
       </div>
       <p class="settings-note">Get a key at <span class="github-link" onclick="openUrl('https://aistudio.google.com/')">Google AI Studio</span></p>
     </div>
@@ -726,6 +735,18 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
 
         case 'model':
           document.getElementById('model-select').value = message.model;
+          break;
+
+        case 'geminiStatus':
+          const geminiConnected = document.getElementById('settings-gemini-connected');
+          const geminiDisconnected = document.getElementById('settings-gemini-disconnected');
+          if (message.hasKey) {
+            if (geminiConnected) geminiConnected.style.display = 'block';
+            if (geminiDisconnected) geminiDisconnected.style.display = 'none';
+          } else {
+            if (geminiConnected) geminiConnected.style.display = 'none';
+            if (geminiDisconnected) geminiDisconnected.style.display = 'block';
+          }
           break;
 
         case 'chatHistory':
@@ -958,8 +979,9 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    function saveGeminiKeyFromSettings() {
-      const key = document.getElementById('settings-gemini-key').value.trim();
+    function saveGeminiKeyFromSettings(inputId) {
+      const inputEl = document.getElementById(inputId || 'settings-gemini-key');
+      const key = inputEl.value.trim();
       if (!key) {
         alert('Please enter a Gemini API Key.');
         return;
@@ -968,7 +990,7 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
         command: 'saveGeminiKey',
         key: key
       });
-      document.getElementById('settings-gemini-key').value = '';
+      inputEl.value = '';
     }
 
     function connectGitHubFromSettings() {

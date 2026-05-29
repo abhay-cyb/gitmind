@@ -275,6 +275,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Check API keys and startup scanning workflow
   const apiKey = await AIProvider.getApiKey(context);
+  sidebarProvider.updateGeminiStatus(!!apiKey);
   if (!apiKey) {
     sidebarProvider.updateStatus('API Key missing ⚠', true);
     WelcomePanel.createOrShow(context, async () => {
@@ -286,6 +287,10 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 async function startBackgroundScan(context: vscode.ExtensionContext, sidebarProvider: GitMindSidebarProvider): Promise<void> {
+  // Update Gemini key status in UI
+  const apiKey = await AIProvider.getApiKey(context);
+  sidebarProvider.updateGeminiStatus(!!apiKey);
+
   // Retrieve GitHub status first so it is always updated regardless of repository state
   const githubToken = await context.secrets.get('gitmind.githubToken');
   if (githubToken) {
