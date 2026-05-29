@@ -5,7 +5,17 @@ export class GeminiClient {
     systemPrompt: string,
     userPrompt: string
   ): Promise<string> {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    // Map experimental/non-existent future models requested by user to latest working ones
+    let actualModel = model;
+    if (model.startsWith('gemini-3')) {
+      if (model.includes('pro')) {
+        actualModel = 'gemini-2.5-pro';
+      } else {
+        actualModel = 'gemini-2.5-flash';
+      }
+    }
+
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${actualModel}:generateContent?key=${apiKey}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 

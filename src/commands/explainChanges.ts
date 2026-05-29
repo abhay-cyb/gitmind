@@ -35,7 +35,10 @@ export async function explainChangesCommand(
     }
 
     // Keep last 5 exchanges (10 messages total: 5 user, 5 assistant)
-    chatHistory.push({ role: 'user', content: query });
+    const lastMsg = chatHistory[chatHistory.length - 1];
+    if (!lastMsg || lastMsg.role !== 'user' || lastMsg.content !== query) {
+      chatHistory.push({ role: 'user', content: query });
+    }
     chatHistory.push({ role: 'assistant', content: response });
 
     if (chatHistory.length > 10) {
@@ -46,7 +49,16 @@ export async function explainChangesCommand(
     sidebarProvider.updateChat(chatHistory);
   } catch (e: any) {
     sidebarProvider.setLoader(false);
-    sidebarProvider.showError(e.message || 'An error occurred during chat summarization.');
+    
+    const lastMsg = chatHistory[chatHistory.length - 1];
+    if (!lastMsg || lastMsg.role !== 'user' || lastMsg.content !== query) {
+      chatHistory.push({ role: 'user', content: query });
+    }
+    chatHistory.push({
+      role: 'assistant',
+      content: `<span style="color: #f48771; font-weight:600;">Error:</span> ${e.message || e}`
+    });
+    sidebarProvider.updateChat(chatHistory);
   }
 }
 
