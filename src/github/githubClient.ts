@@ -5,7 +5,8 @@ export class GitHubClient {
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.token}`,
       'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28'
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'GitMind-VSCode-Extension'
     };
 
     if (options.body || options.method === 'POST' || options.method === 'PUT') {

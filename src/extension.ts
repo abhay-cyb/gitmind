@@ -84,6 +84,39 @@ export async function activate(context: vscode.ExtensionContext) {
         await vscode.commands.executeCommand('gitmind.connectGitHub');
         break;
 
+      case 'saveGeminiKey':
+        if (action.key) {
+          try {
+            await GeminiClient.complete(action.key, 'gemini-2.0-flash', 'You are a helpful assistant.', 'Hi');
+            await AIProvider.setApiKey(context, action.key);
+            showInfo('Gemini API Key saved ✓');
+            await startBackgroundScan(context, sidebarProvider);
+          } catch (e: any) {
+            showError('Invalid Gemini API Key. Please check and try again.');
+          }
+        }
+        break;
+
+      case 'saveGitHubTokenFromSettings':
+        if (action.token) {
+          try {
+            const client = new GitHubClient(action.token);
+            const user = await client.getAuthenticatedUser();
+            await context.secrets.store('gitmind.githubToken', action.token);
+            showInfo(`Connected to GitHub as @${user.login} ✓`);
+            await startBackgroundScan(context, sidebarProvider);
+          } catch (e: any) {
+            showError('Invalid GitHub token. Ensure it has "repo" scope.');
+          }
+        }
+        break;
+
+      case 'disconnectGitHub':
+        await context.secrets.delete('gitmind.githubToken');
+        showInfo('GitHub account disconnected.');
+        sidebarProvider.updateGitHubStatus(null);
+        break;
+
       case 'openUrl':
         if (action.hash) { // Using 'hash' property passed in action as URL
           vscode.env.openExternal(vscode.Uri.parse(action.hash));

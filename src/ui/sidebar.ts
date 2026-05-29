@@ -431,6 +431,102 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       text-decoration: underline;
       cursor: pointer;
     }
+
+    .icon-btn {
+      background: transparent;
+      border: none;
+      color: var(--vscode-foreground);
+      cursor: pointer;
+      font-size: 1.25em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s;
+    }
+    .icon-btn:hover {
+      background-color: rgba(255,255,255,0.08);
+    }
+
+    /* Settings Panel styling */
+    .settings-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      background: var(--vscode-sideBar-background);
+    }
+    .settings-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .settings-section h3 {
+      margin: 0;
+      font-size: 1em;
+      font-weight: 600;
+      color: var(--vscode-foreground);
+    }
+    .settings-row-input {
+      display: flex;
+      gap: 8px;
+    }
+    .settings-row-input input {
+      flex: 1;
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border, rgba(255,255,255,0.15));
+      border-radius: 4px;
+      padding: 6px 10px;
+      outline: none;
+      font-size: 0.95em;
+    }
+    .settings-row-input input:focus {
+      border-color: var(--gitmind-accent);
+    }
+    .settings-btn {
+      background: var(--gitmind-accent);
+      color: var(--vscode-button-foreground, #ffffff);
+      border: none;
+      border-radius: 4px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.95em;
+      transition: background-color 0.2s;
+    }
+    .settings-btn:hover {
+      background: var(--gitmind-accent-hover);
+    }
+    .settings-btn.disconnect-btn {
+      background: #f48771;
+      color: #ffffff;
+      width: 100%;
+    }
+    .settings-btn.disconnect-btn:hover {
+      background: #e06c54;
+    }
+    .settings-btn.close-btn {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--vscode-foreground);
+      border: 1px solid var(--border-color);
+      width: 100%;
+    }
+    .settings-btn.close-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+    .settings-note {
+      margin: 0;
+      font-size: 0.85em;
+      color: var(--vscode-descriptionForeground);
+    }
+    .connected-user {
+      margin: 4px 0 8px 0;
+      font-size: 0.95em;
+    }
   </style>
 </head>
 <body>
@@ -439,7 +535,10 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
   <div class="header">
     <div class="header-top">
       <div class="brand-title">🧠 GitMind V2</div>
-      <div id="scan-badge" class="status-badge ready">Checking...</div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button id="settings-toggle-btn" class="icon-btn" onclick="toggleSettings()" title="Settings">⚙</button>
+        <div id="scan-badge" class="status-badge ready">Checking...</div>
+      </div>
     </div>
     
     <div class="status-row">
@@ -456,6 +555,37 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
         <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
         <option value="gemini-1.5-pro">Gemini 1.5 Pro (Most Capable)</option>
       </select>
+    </div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div id="settings-panel" class="settings-panel" style="display: none;">
+    <div class="settings-section">
+      <h3>Gemini API Key</h3>
+      <div class="settings-row-input">
+        <input type="password" id="settings-gemini-key" placeholder="Paste Gemini API Key..." />
+        <button class="settings-btn" onclick="saveGeminiKeyFromSettings()">Save</button>
+      </div>
+      <p class="settings-note">Get a key at <span class="github-link" onclick="openUrl('https://aistudio.google.com/')">Google AI Studio</span></p>
+    </div>
+
+    <div class="settings-section">
+      <h3>GitHub Connection</h3>
+      <div id="settings-github-connected" style="display: none;">
+        <p class="connected-user">Connected as <strong id="settings-github-username">@username</strong></p>
+        <button class="settings-btn disconnect-btn" onclick="disconnectGitHubFromSettings()">Disconnect GitHub</button>
+      </div>
+      <div id="settings-github-disconnected">
+        <div class="settings-row-input">
+          <input type="password" id="settings-github-token" placeholder="Paste ghp_..." />
+          <button class="settings-btn" onclick="connectGitHubFromSettings()">Connect</button>
+        </div>
+        <p class="settings-note">Create token with <code>repo</code> scope at <span class="github-link" onclick="openUrl('https://github.com/settings/tokens')">github.com</span></p>
+      </div>
+    </div>
+
+    <div class="settings-section" style="margin-top: auto; padding-top: 20px;">
+      <button class="settings-btn close-btn" onclick="toggleSettings()">Back to Chat</button>
     </div>
   </div>
 
@@ -511,12 +641,23 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
         case 'githubStatus':
           const dot = document.getElementById('github-dot');
           const label = document.getElementById('github-label');
+          const settingsConnected = document.getElementById('settings-github-connected');
+          const settingsDisconnected = document.getElementById('settings-github-disconnected');
+          const settingsUsername = document.getElementById('settings-github-username');
+          
           if (message.username) {
             dot.className = 'github-dot connected';
             label.innerText = 'Connected: @' + message.username;
+            
+            if (settingsUsername) settingsUsername.innerText = '@' + message.username;
+            if (settingsConnected) settingsConnected.style.display = 'block';
+            if (settingsDisconnected) settingsDisconnected.style.display = 'none';
           } else {
             dot.className = 'github-dot';
             label.innerText = 'Not connected';
+            
+            if (settingsConnected) settingsConnected.style.display = 'none';
+            if (settingsDisconnected) settingsDisconnected.style.display = 'block';
           }
           break;
 
@@ -719,6 +860,61 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
       bubble.innerHTML = titleHtml + content;
       chatPanel.appendChild(bubble);
       chatPanel.scrollTop = chatPanel.scrollHeight;
+    }
+
+    let settingsOpen = false;
+    function toggleSettings() {
+      settingsOpen = !settingsOpen;
+      const chatPanel = document.getElementById('chat-messages-panel');
+      const inputContainer = document.querySelector('.input-container');
+      const settingsPanel = document.getElementById('settings-panel');
+      const toggleBtn = document.getElementById('settings-toggle-btn');
+      
+      if (settingsOpen) {
+        chatPanel.style.display = 'none';
+        inputContainer.style.display = 'none';
+        settingsPanel.style.display = 'flex';
+        toggleBtn.innerText = '✕';
+        toggleBtn.title = 'Close Settings';
+      } else {
+        chatPanel.style.display = 'flex';
+        inputContainer.style.display = 'flex';
+        settingsPanel.style.display = 'none';
+        toggleBtn.innerText = '⚙';
+        toggleBtn.title = 'Settings';
+      }
+    }
+
+    function saveGeminiKeyFromSettings() {
+      const key = document.getElementById('settings-gemini-key').value.trim();
+      if (!key) {
+        alert('Please enter a Gemini API Key.');
+        return;
+      }
+      vscode.postMessage({
+        command: 'saveGeminiKey',
+        key: key
+      });
+      document.getElementById('settings-gemini-key').value = '';
+    }
+
+    function connectGitHubFromSettings() {
+      const token = document.getElementById('settings-github-token').value.trim();
+      if (!token) {
+        alert('Please enter a GitHub token.');
+        return;
+      }
+      vscode.postMessage({
+        command: 'saveGitHubTokenFromSettings',
+        token: token
+      });
+      document.getElementById('settings-github-token').value = '';
+    }
+
+    function disconnectGitHubFromSettings() {
+      vscode.postMessage({
+        command: 'disconnectGitHub'
+      });
     }
   </script>
 </body>
