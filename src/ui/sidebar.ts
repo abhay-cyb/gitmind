@@ -81,6 +81,12 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  public postMessage(message: any): void {
+    if (this._view) {
+      this._view.webview.postMessage(message);
+    }
+  }
+
   private _getHtmlForWebview(): string {
     return `<!DOCTYPE html>
 <html lang="en">
