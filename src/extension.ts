@@ -11,9 +11,6 @@ import { isGitRepository, getGitClient } from './git/status';
 import { showInfo, showError } from './ui/notifications';
 import { GitHubClient } from './github/githubClient';
 import { parseGitHubIntent } from './github/githubCommands';
-import { ProjectMemory } from './storage/projectMemory';
-import * as fs from 'fs';
-import * as path from 'path';
 
 export async function activate(context: vscode.ExtensionContext) {
   let chatHistory: Array<{ role: 'user' | 'assistant'; content: string; isHtml?: boolean }> = [];
