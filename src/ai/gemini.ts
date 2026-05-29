@@ -1,21 +1,11 @@
 export class GeminiClient {
-  public static async complete(
+  private static async executeRequest(
     apiKey: string,
     model: string,
     systemPrompt: string,
     userPrompt: string
   ): Promise<string> {
-    // Map experimental/non-existent future models requested by user to latest working ones
-    let actualModel = model;
-    if (model.startsWith('gemini-3')) {
-      if (model.includes('pro')) {
-        actualModel = 'gemini-2.5-pro';
-      } else {
-        actualModel = 'gemini-2.5-flash';
-      }
-    }
-
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${actualModel}:generateContent?key=${apiKey}`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
@@ -77,6 +67,71 @@ export class GeminiClient {
       }
       if (error instanceof TypeError) {
         throw new Error('Cannot reach Gemini API. Check your internet connection.');
+      }
+      throw error;
+    }
+  }
+
+  public static async complete(
+    apiKey: string,
+    model: string,
+    systemPrompt: string,
+    userPrompt: string
+  ): Promise<string> {
+    // 1. Resolve exact API model identifiers
+    let actualModel = model;
+    if (model === 'gemini-3.5-flash') {
+      actualModel = 'gemini-3.5-flash';
+    } else if (model === 'gemini-3.1-pro') {
+      actualModel = 'gemini-3.1-pro-preview';
+    } else if (model === 'gemini-3-flash') {
+      actualModel = 'gemini-3-flash-preview';
+    } else if (model === 'gemini-3.1-flash-lite') {
+      actualModel = 'gemini-3.1-flash-lite';
+    } else if (model === 'gemini-2.5-pro') {
+      actualModel = 'gemini-2.5-pro';
+    } else if (model === 'gemini-2.5-flash') {
+      actualModel = 'gemini-2.5-flash';
+    } else if (model === 'gemini-2.0-flash') {
+      actualModel = 'gemini-2.0-flash';
+    } else if (model === 'gemini-1.5-pro') {
+      actualModel = 'gemini-1.5-pro';
+    }
+
+    // 2. Try the primary model
+    try {
+      return await this.executeRequest(apiKey, actualModel, systemPrompt, userPrompt);
+    } catch (error: any) {
+      // If error is 503 (temporarily unavailable) or 429 (rate limit / quota exceeded)
+      const isRetryable = 
+        error.message.includes('unavailable') || 
+        error.message.includes('limit') || 
+        error.message.includes('status 429') || 
+        error.message.includes('status 503') ||
+        error.message.includes('quota') ||
+        error.message.includes('Quota');
+      
+      if (isRetryable) {
+        // Fallback chain 1: Try gemini-3-flash-preview (very fast & high limit)
+        if (actualModel !== 'gemini-3-flash-preview') {
+          try {
+            return await this.executeRequest(apiKey, 'gemini-3-flash-preview', systemPrompt, userPrompt);
+          } catch (e2) {}
+        }
+        
+        // Fallback chain 2: Try gemini-3.1-flash-lite (most available model)
+        if (actualModel !== 'gemini-3.1-flash-lite') {
+          try {
+            return await this.executeRequest(apiKey, 'gemini-3.1-flash-lite', systemPrompt, userPrompt);
+          } catch (e3) {}
+        }
+
+        // Fallback chain 3: Try gemini-2.5-flash (standard stable endpoint)
+        if (actualModel !== 'gemini-2.5-flash') {
+          try {
+            return await this.executeRequest(apiKey, 'gemini-2.5-flash', systemPrompt, userPrompt);
+          } catch (e4) {}
+        }
       }
       throw error;
     }
