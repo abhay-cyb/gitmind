@@ -38,7 +38,24 @@ export class AIProvider {
     
     // Load local project context
     const projectContext = ProjectMemory.readContext() || 'No project context available.';
-    const systemPrompt = getSystemPrompt(projectContext, options?.isBreakingCommitAnalysis);
+    let systemPrompt = getSystemPrompt(projectContext, options?.isBreakingCommitAnalysis);
+
+    // Retrieve cached GitHub username and append to systemPrompt
+    const githubUsername = context.globalState.get<string>('gitmind.githubUsername');
+    if (githubUsername) {
+      systemPrompt += `\n\nActive GitHub Connection: Connected as user @${githubUsername}. You can answer questions about the user's identity using this username.`;
+    }
+
+    // Retrieve cached git repository details and append to systemPrompt
+    const repoOwner = context.globalState.get<string>('gitmind.repoOwner');
+    const repoName = context.globalState.get<string>('gitmind.repoName');
+    const activeBranch = context.globalState.get<string>('gitmind.activeBranch');
+    if (repoOwner && repoName) {
+      systemPrompt += `\n\nLocal Git Repository: ${repoOwner}/${repoName}`;
+    }
+    if (activeBranch) {
+      systemPrompt += `\nActive Git Branch: ${activeBranch}`;
+    }
 
     return await GeminiClient.complete(apiKey, model, systemPrompt, userPrompt);
   }

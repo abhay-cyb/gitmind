@@ -7,7 +7,7 @@ import { RepoScanner } from './scanner/repoScanner';
 import { findBreakingCommitCommand } from './commands/findBreakingCommit';
 import { explainConflictCommand, registerConflictAutoTrigger } from './commands/mergeConflict';
 import { explainChangesCommand, ChatMessage } from './commands/explainChanges';
-import { isGitRepository, getGitClient } from './git/status';
+import { isGitRepository, getGitClient, getCurrentBranch } from './git/status';
 import { showInfo, showError } from './ui/notifications';
 import { GitHubClient } from './github/githubClient';
 import { parseGitHubIntent } from './github/githubCommands';
@@ -116,6 +116,7 @@ export async function activate(context: vscode.ExtensionContext) {
             const client = new GitHubClient((action as any).token);
             const user = await client.getAuthenticatedUser();
             await context.secrets.store('gitmind.githubToken', (action as any).token);
+            await context.globalState.update('gitmind.githubUsername', user.login);
             showInfo(`Connected to GitHub as @${user.login} ✓`);
             await startBackgroundScan(context, sidebarProvider);
           } catch (e: any) {
@@ -126,6 +127,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
       case 'disconnectGitHub':
         await context.secrets.delete('gitmind.githubToken');
+        await context.globalState.update('gitmind.githubUsername', undefined);
         showInfo('GitHub account disconnected.');
         sidebarProvider.updateGitHubStatus(null);
         break;
@@ -307,11 +309,14 @@ async function startBackgroundScan(context: vscode.ExtensionContext, sidebarProv
       const client = new GitHubClient(githubToken);
       const user = await client.getAuthenticatedUser();
       sidebarProvider.updateGitHubStatus(user.login);
+      await context.globalState.update('gitmind.githubUsername', user.login);
     } catch (e) {
       sidebarProvider.updateGitHubStatus(null);
+      await context.globalState.update('gitmind.githubUsername', undefined);
     }
   } else {
     sidebarProvider.updateGitHubStatus(null);
+    await context.globalState.update('gitmind.githubUsername', undefined);
   }
 
   // Update selected model in UI
@@ -321,8 +326,17 @@ async function startBackgroundScan(context: vscode.ExtensionContext, sidebarProv
   const hasGit = await isGitRepository();
   if (!hasGit) {
     sidebarProvider.updateStatus('No git repo ⚠', true);
+    await context.globalState.update('gitmind.repoOwner', undefined);
+    await context.globalState.update('gitmind.repoName', undefined);
+    await context.globalState.update('gitmind.activeBranch', undefined);
     return;
   }
+
+  const remoteInfo = await getGitRemoteOwnerRepo();
+  const currentBranch = await getCurrentBranch();
+  await context.globalState.update('gitmind.repoOwner', remoteInfo?.owner);
+  await context.globalState.update('gitmind.repoName', remoteInfo?.repo);
+  await context.globalState.update('gitmind.activeBranch', currentBranch);
 
   sidebarProvider.updateStatus('Scanning... ⏳');
   
