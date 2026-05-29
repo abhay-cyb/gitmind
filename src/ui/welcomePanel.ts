@@ -48,10 +48,10 @@ export class WelcomePanel {
         switch (message.command) {
           case 'saveKey':
             try {
-              await context.secrets.store('gitmind.openrouterApiKey', message.key);
+              await context.secrets.store('gitmind.geminiApiKey', message.key);
               this._panel.webview.postMessage({ type: 'showGithubStep' });
             } catch (e: any) {
-              vscode.window.showErrorMessage(`Failed to save OpenRouter key: ${e.message}`);
+              vscode.window.showErrorMessage(`Failed to save Gemini API key: ${e.message}`);
             }
             break;
 
@@ -70,7 +70,7 @@ export class WelcomePanel {
                 username: user.login 
               });
               
-              // Close welcomed panel after showing success
+              // Close welcome panel after showing success
               setTimeout(() => {
                 this.dispose();
               }, 1200);
@@ -331,19 +331,20 @@ export class WelcomePanel {
     <h1>GitMind V2</h1>
     <p class="subtitle">AI-Powered Git Intelligence & GitHub Co-Authoring</p>
 
-    <!-- STEP 1: OPENROUTER KEY -->
+    <!-- STEP 1: GEMINI KEY -->
     <div id="step-1" class="step-card">
       <div class="step-header">
         <span class="step-number">1</span>
-        OpenRouter Connection
+        Google Gemini Connection
       </div>
       <div class="instruction-text">
-        GitMind uses OpenRouter models for explaining breaking commits, code changes, and merge conflicts. 
-        Get a key at <span class="link" onclick="openUrl('https://openrouter.ai/')">openrouter.ai</span>.
+        Step 1: Go to <span class="link" onclick="openUrl('https://aistudio.google.com/')">aistudio.google.com</span> → Sign in with Google → Click 'Get API Key' → Create API Key → Copy it.
+        <br/><br/>
+        Step 2: Paste your Gemini API key below:
       </div>
       <div class="input-group">
-        <input type="password" id="apiKey" placeholder="Paste sk-or-v1-..." autocomplete="off">
-        <button class="btn" onclick="saveStep1()">Next Step</button>
+        <input type="password" id="apiKey" placeholder="Paste Gemini API Key..." autocomplete="off">
+        <button class="btn" onclick="saveStep1()">Save Key & Get Started</button>
       </div>
     </div>
 
@@ -351,20 +352,19 @@ export class WelcomePanel {
     <div id="step-2" class="step-card" style="display: none;">
       <div class="step-header">
         <span class="step-number">2</span>
-        GitHub Integration (Optional)
+        Connect GitHub <span class="optional">(Optional)</span>
       </div>
       <div class="instruction-text">
-        Connect your GitHub account to create repos, branches, issues, and Pull Requests using natural language chat. 
-        <br/>
-        Create a Personal Access Token (PAT) at 
-        <span class="link" onclick="openUrl('https://github.com/settings/tokens')">github.com/settings/tokens</span> 
-        (make sure to select the <strong>repo</strong> scope).
+        Link your GitHub account to create repos, branches, PRs, and issues directly from chat.
+        <br/><br/>
+        Create a token at <span class="link" onclick="openUrl('https://github.com/settings/tokens')">github.com/settings/tokens</span> 
+        — select <strong>repo</strong> scope only.
       </div>
       
       <div class="input-group">
-        <input type="password" id="githubToken" placeholder="Paste ghp_..." autocomplete="off">
-        <button class="btn" onclick="saveStep2()">Connect GitHub</button>
-        <button class="btn-secondary" onclick="skipStep2()">Skip for now</button>
+        <input type="password" id="githubToken" placeholder="ghp_..." autocomplete="off">
+        <button class="btn" onclick="saveGithubToken()">Connect GitHub</button>
+        <button class="btn-secondary" onclick="skipGithub()">Skip for now</button>
       </div>
 
       <div id="validation-spinner" class="loading-spinner">
@@ -374,6 +374,7 @@ export class WelcomePanel {
 
       <div id="error-box" class="error-msg"></div>
       <div id="success-box" class="success-msg"></div>
+      <p id="githubStatus"></p>
     </div>
 
   </div>
@@ -391,7 +392,7 @@ export class WelcomePanel {
     function saveStep1() {
       const key = document.getElementById('apiKey').value.trim();
       if (!key) {
-        alert('Please enter your OpenRouter API Key.');
+        alert('Please enter your Gemini API Key.');
         return;
       }
       vscode.postMessage({
@@ -400,7 +401,7 @@ export class WelcomePanel {
       });
     }
 
-    function saveStep2() {
+    function saveGithubToken() {
       const token = document.getElementById('githubToken').value.trim();
       if (!token) {
         alert('Please enter a GitHub Token.');
@@ -412,7 +413,7 @@ export class WelcomePanel {
       });
     }
 
-    function skipStep2() {
+    function skipGithub() {
       vscode.postMessage({
         command: 'skipGithub'
       });

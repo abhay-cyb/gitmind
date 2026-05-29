@@ -30,7 +30,7 @@
       },
       {
         "command": "gitmind.setApiKey",
-        "title": "GitMind: Set OpenRouter API Key"
+        "title": "GitMind: Set Gemini API Key"
       },
       {
         "command": "gitmind.refreshContext",
@@ -39,6 +39,10 @@
       {
         "command": "gitmind.connectGitHub",
         "title": "GitMind: Connect GitHub Account"
+      },
+      {
+        "command": "gitmind.disconnectGitHub",
+        "title": "GitMind: Disconnect GitHub Account"
       }
     ],
     "viewsContainers": {
@@ -62,10 +66,10 @@
     "configuration": {
       "title": "GitMind",
       "properties": {
-        "gitmind.openrouterModel": {
+        "gitmind.geminiModel": {
           "type": "string",
-          "default": "google/gemini-2.0-flash-exp:free",
-          "description": "Model to use for OpenRouter requests."
+          "default": "gemini-2.0-flash",
+          "description": "Gemini model to use. All models are free on Google AI Studio."
         }
       }
     }

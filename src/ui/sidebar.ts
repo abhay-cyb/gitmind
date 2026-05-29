@@ -445,14 +445,10 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
 
     <div class="model-select-wrapper">
       <select id="model-select" onchange="changeModel()">
-        <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash — Free ⭐</option>
-        <option value="google/gemma-3-12b-it:free">Gemma 3 12B — Free</option>
-        <option value="google/gemma-3-27b-it:free">Gemma 3 27B — Free</option>
-        <option value="deepseek/deepseek-r1:free">DeepSeek R1 — Free</option>
-        <option value="meta-llama/llama-4-scout:free">Llama 4 Scout — Free</option>
-        <option value="qwen/qwen3-235b-a22b:free">Qwen3 235B — Free</option>
-        <option value="anthropic/claude-3.5-haiku">Claude 3.5 Haiku</option>
-        <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+        <option value="gemini-2.0-flash">Gemini 2.0 Flash ⭐ Recommended</option>
+        <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite (Fastest)</option>
+        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Most Capable)</option>
       </select>
     </div>
   </div>
