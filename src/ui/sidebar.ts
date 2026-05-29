@@ -816,9 +816,9 @@ export class GitMindSidebarProvider implements vscode.WebviewViewProvider {
         .replace(/>/g, "&gt;");
 
       // Translate code blocks
-      escaped = escaped.replace(/\\`\\`\\`([\\s\\S]*?)\\`\\`\\`/g, '<pre><code>$1</code></pre>');
+      escaped = escaped.replace(/\`\`\`([\\s\\S]*?)\`\`\`/g, '<pre><code>$1</code></pre>');
       // Translate inline code
-      escaped = escaped.replace(/\\`([^\\`]+)\\`/g, '<code>$1</code>');
+      escaped = escaped.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
       
       // Parse markdown links [text](url)
       escaped = escaped.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^\\s\\)]+)\\)/g, '<a class="github-link" onclick="openUrl(\\\'$2\\\')">$1</a>');
