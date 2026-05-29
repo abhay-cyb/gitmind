@@ -99,12 +99,12 @@ export async function activate(context: vscode.ExtensionContext) {
             showInfo('Gemini API Key saved ✓');
             await startBackgroundScan(context, sidebarProvider);
           } catch (e: any) {
-            if (e.message.includes('rate limit') || e.message.includes('429') || e.message.includes('Quota')) {
-              await AIProvider.setApiKey(context, (action as any).key);
-              showInfo('Gemini API Key saved ✓ (Quota rate limit warning)');
-              await startBackgroundScan(context, sidebarProvider);
+            if (e.message.includes('API key') || e.message.includes('403') || e.message.includes('Key')) {
+              showError('Invalid Gemini API Key. Please check and try again.');
             } else {
-              showError(`Gemini validation failed: ${e.message || e}`);
+              await AIProvider.setApiKey(context, (action as any).key);
+              showInfo('Gemini API Key saved ✓ (Temporary connection warning)');
+              await startBackgroundScan(context, sidebarProvider);
             }
           }
         }
@@ -248,14 +248,12 @@ export async function activate(context: vscode.ExtensionContext) {
           showInfo('Gemini API Key saved ✓');
           await startBackgroundScan(context, sidebarProvider);
         } catch (e: any) {
-          if (e.message.includes('rate limit') || e.message.includes('429') || e.message.includes('Quota')) {
-            await AIProvider.setApiKey(context, key);
-            showInfo('Gemini API Key saved ✓ (Quota rate limit warning)');
-            await startBackgroundScan(context, sidebarProvider);
-          } else if (e.message.includes('API key') || e.message.includes('403') || e.message.includes('Key')) {
-            showError('Invalid key. Please check and try again.');
+          if (e.message.includes('API key') || e.message.includes('403') || e.message.includes('Key')) {
+            showError('Invalid Gemini API Key. Please check and try again.');
           } else {
-            showError(e.message || 'Validation failed.');
+            await AIProvider.setApiKey(context, key);
+            showInfo('Gemini API Key saved ✓ (Temporary connection warning)');
+            await startBackgroundScan(context, sidebarProvider);
           }
         }
       }
