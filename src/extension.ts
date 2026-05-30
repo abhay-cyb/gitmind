@@ -371,25 +371,28 @@ async function getGitRemoteOwnerRepo(): Promise<{ owner: string; repo: string } 
 async function handleGitHubAction(
   context: vscode.ExtensionContext,
   sidebarProvider: GitMindSidebarProvider,
-  text: string
+  text: string,
+  chatHistory: Array<{ role: 'user' | 'assistant'; content: string; isHtml?: boolean }>
 ): Promise<void> {
   const token = await context.secrets.get('gitmind.githubToken');
   if (!token) {
-    sidebarProvider.postMessage({
-      command: 'githubError',
-      type: 'githubError',
-      text: 'Connect GitHub first via Connect GitHub Account command.'
+    chatHistory.push({
+      role: 'assistant',
+      content: 'Connect GitHub first via Connect GitHub Account command.',
+      isHtml: false
     });
+    sidebarProvider.updateChat(chatHistory);
     return;
   }
 
   const intent = parseGitHubIntent(text);
   if (intent.action === 'unknown') {
-    sidebarProvider.postMessage({
-      command: 'githubError',
-      type: 'githubError',
-      text: 'Unknown GitHub action. Please rephrase.'
+    chatHistory.push({
+      role: 'assistant',
+      content: 'Unknown GitHub action. Please rephrase.',
+      isHtml: false
     });
+    sidebarProvider.updateChat(chatHistory);
     return;
   }
 
@@ -501,11 +504,13 @@ async function handleGitHubAction(
     }
 
     sidebarProvider.setThinking(false);
-    sidebarProvider.postMessage({
-      command: 'githubResult',
-      type: 'githubResult',
-      text: resultText
+    sidebarProvider.setThinking(false);
+    chatHistory.push({
+      role: 'assistant',
+      content: resultText,
+      isHtml: true
     });
+    sidebarProvider.updateChat(chatHistory);
   } catch (e: any) {
     sidebarProvider.setThinking(false);
     let friendlyError = e.message || 'An error occurred during transaction.';
@@ -519,11 +524,12 @@ async function handleGitHubAction(
       friendlyError = "GitHub rejected this action. The branch or PR may already exist.";
     }
 
-    sidebarProvider.postMessage({
-      command: 'githubError',
-      type: 'githubError',
-      text: friendlyError
+    chatHistory.push({
+      role: 'assistant',
+      content: friendlyError,
+      isHtml: false
     });
+    sidebarProvider.updateChat(chatHistory);
   }
 }
 
