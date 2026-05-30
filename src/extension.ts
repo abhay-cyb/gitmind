@@ -66,7 +66,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
       case 'githubAction':
         const msgText = (action as any).text || action.query || '';
-        await handleGitHubAction(context, sidebarProvider, msgText);
+        await handleGitHubAction(context, sidebarProvider, msgText, chatHistory);
         break;
 
       case 'viewCommit':
@@ -89,7 +89,7 @@ export async function activate(context: vscode.ExtensionContext) {
       case 'saveGeminiKey':
         if ((action as any).key) {
           try {
-            await GeminiClient.complete((action as any).key, 'gemini-3.5-flash', 'You are a helpful assistant.', 'Hi');
+            await GeminiClient.complete((action as any).key, 'gemini-2.0-flash', 'You are a helpful assistant.', 'Hi');
             await AIProvider.setApiKey(context, (action as any).key);
             showInfo('Gemini API Key saved ✓');
             await startBackgroundScan(context, sidebarProvider);
@@ -235,7 +235,7 @@ export async function activate(context: vscode.ExtensionContext) {
       });
       if (key) {
         try {
-          await GeminiClient.complete(key, 'gemini-3.5-flash', 'You are a helpful assistant.', 'Hi');
+          await GeminiClient.complete(key, 'gemini-2.0-flash', 'You are a helpful assistant.', 'Hi');
           await AIProvider.setApiKey(context, key);
           showInfo('Gemini API Key saved ✓');
           await startBackgroundScan(context, sidebarProvider);
@@ -547,145 +547,16 @@ async function handleChatQuery(
   sidebarProvider.setThinking(true);
 
   try {
-    const githubToken = await context.secrets.get('gitmind.githubToken');
-
-    // 3. Run standard AI explain changes/chat command
-    const legacyHistory: ChatMessage[] = chatHistory.map(h => ({
-      role: h.role,
-      content: h.content,
-      isHtml: h.isHtml
-    }));
-
-    // Directly invoke explainChangesCommand
-    await explainChangesCommand(context, query, sidebarProvider, legacyHistory);
-
-    // sync legacyHistory back into chatHistory
-    chatHistory.splice(0, chatHistory.length);
-    legacyHistory.forEach(h => {
-      chatHistory.push({
-        role: h.role,
-        content: h.content,
-        isHtml: h.isHtml
-      });
-    });
-
-    // 4. Extract and execute agentic GITHUB_ACTION if present
-    const lastMsg = chatHistory[chatHistory.length - 1];
-    if (lastMsg && lastMsg.role === 'assistant') {
-      const actionMatch = lastMsg.content.match(/\[GITHUB_ACTION:\s*(\{[\s\S]*?\})\s*\]/);
-      if (actionMatch) {
-        // Remove the action markup from user-facing text
-        lastMsg.content = lastMsg.content.replace(/\[GITHUB_ACTION:\s*\{[\s\S]*?\}\s*\]/g, '').trim();
-        
-        try {
-          const actionObj = JSON.parse(actionMatch[1]);
-          const actionType = actionObj.action;
-          const params = actionObj.params || {};
-
-          if (!githubToken) {
-            throw new Error("Connect your GitHub account first.");
-          }
-          const client = new GitHubClient(githubToken);
-          let resultText = '';
-
-          switch (actionType) {
-            case 'create_repo': {
-              const name = params.name;
-              if (!name) {
-                throw new Error('Repository name is missing in action parameters.');
-              }
-              const desc = params.description || 'Repository created by GitMind';
-              const isPrivate = params.private === true;
-              const repo = await client.createRepo(name, desc, isPrivate);
-              resultText = `Created repository: <a class="github-link" onclick="openUrl('${repo.url}')">${name}</a> (Private: ${isPrivate ? 'yes' : 'no'}) ✓`;
-              break;
-            }
-            case 'create_branch': {
-              const branchName = params.name;
-              if (!branchName) {
-                throw new Error('Branch name is missing in action parameters.');
-              }
-              const remote = await getGitRemoteOwnerRepo();
-              if (!remote) {
-                throw new Error('No GitHub remote origin configured in local git repository.');
-              }
-              const from = params.from || 'main';
-              await client.createBranch(remote.owner, remote.repo, branchName, from);
-              resultText = `Created branch <strong>${branchName}</strong> from <strong>${from}</strong> on GitHub ✓`;
-              break;
-            }
-            case 'create_pr': {
-              const remote = await getGitRemoteOwnerRepo();
-              if (!remote) {
-                throw new Error('No GitHub remote origin configured in local git repository.');
-              }
-              const head = params.from;
-              const base = params.to || 'main';
-              if (!head) {
-                throw new Error('Source branch (from) is missing in PR parameters.');
-              }
-              const title = params.title || `PR from ${head} into ${base}`;
-              const body = 'Pull request created automatically by GitMind V2.';
-              const pr = await client.createPullRequest(remote.owner, remote.repo, title, body, head, base);
-              resultText = `Created Pull Request: <a class="github-link" onclick="openUrl('${pr.url}')">#${pr.number}: ${title}</a> ✓`;
-              break;
-            }
-            case 'merge_pr': {
-              const remote = await getGitRemoteOwnerRepo();
-              if (!remote) {
-                throw new Error('No GitHub remote origin configured in local git repository.');
-              }
-              const prNum = parseInt(params.prNumber, 10);
-              if (isNaN(prNum)) {
-                throw new Error('Pull request number is missing or invalid.');
-              }
-              await client.mergePullRequest(remote.owner, remote.repo, prNum);
-              resultText = `Merged PR <strong>#${prNum}</strong> successfully ✓`;
-              break;
-            }
-            case 'create_issue': {
-              const remote = await getGitRemoteOwnerRepo();
-              if (!remote) {
-                throw new Error('No GitHub remote origin configured in local git repository.');
-              }
-              const title = params.title;
-              if (!title) {
-                throw new Error('Issue title is missing in action parameters.');
-              }
-              const body = params.body || 'Issue created automatically by GitMind V2.';
-              const issue = await client.createIssue(remote.owner, remote.repo, title, body);
-              resultText = `Created Issue: <a class="github-link" onclick="openUrl('${issue.url}')">#${issue.number}: ${title}</a> ✓`;
-              break;
-            }
-            default:
-              throw new Error(`Unsupported GITHUB_ACTION: ${actionType}`);
-          }
-
-          chatHistory.push({
-            role: 'assistant',
-            content: resultText,
-            isHtml: true
-          });
-
-        } catch (e: any) {
-          let friendlyError = e.message || 'An error occurred during transaction.';
-          if (e.message === 'GITHUB_UNAUTHORIZED') {
-            friendlyError = "GitHub token expired or invalid. Run 'GitMind: Connect GitHub Account' to reconnect.";
-          } else if (e.message === 'GITHUB_FORBIDDEN') {
-            friendlyError = "You don't have permission for this action on this repo.";
-          } else if (e.message === 'GITHUB_NOT_FOUND') {
-            friendlyError = "Repo or resource not found. Check the name and try again.";
-          } else if (e.message === 'GITHUB_UNPROCESSABLE') {
-            friendlyError = "GitHub rejected this action. The branch or PR may already exist.";
-          }
-          chatHistory.push({
-            role: 'assistant',
-            content: `<div style="color: #f48771; font-weight:600;">GitHub Action Error:</div> ${friendlyError}`,
-            isHtml: true
-          });
-        }
-      }
+    // 3. Check GitHub intent FIRST
+    const intent = parseGitHubIntent(query);
+    if (intent.action !== 'unknown') {
+      await handleGitHubAction(context, sidebarProvider, query, chatHistory);
+      sidebarProvider.setThinking(false);
+      return; // Stop here, don't call AI
     }
+
+    // 4. Only if intent.action === 'unknown':
+    await explainChangesCommand(context, query, sidebarProvider, chatHistory);
   } catch (e: any) {
     chatHistory.push({
       role: 'assistant',
@@ -694,6 +565,7 @@ async function handleChatQuery(
     });
   }
 
+  // 5. Update UI state
   sidebarProvider.setThinking(false);
   sidebarProvider.updateChat(chatHistory);
 }
