@@ -6,7 +6,7 @@ import { GeminiClient } from './ai/gemini';
 import { RepoScanner } from './scanner/repoScanner';
 import { findBreakingCommitCommand } from './commands/findBreakingCommit';
 import { explainConflictCommand, registerConflictAutoTrigger } from './commands/mergeConflict';
-import { explainChangesCommand, ChatMessage } from './commands/explainChanges';
+import { explainChangesCommand } from './commands/explainChanges';
 import { isGitRepository, getGitClient, getCurrentBranch } from './git/status';
 import { showInfo, showError } from './ui/notifications';
 import { GitHubClient } from './github/githubClient';
@@ -89,7 +89,7 @@ export async function activate(context: vscode.ExtensionContext) {
       case 'saveGeminiKey':
         if ((action as any).key) {
           try {
-            await GeminiClient.complete((action as any).key, 'gemini-2.0-flash', 'You are a helpful assistant.', 'Hi');
+            await GeminiClient.complete((action as any).key, 'gemini-3.5-flash', 'You are a helpful assistant.', 'Hi');
             await AIProvider.setApiKey(context, (action as any).key);
             showInfo('Gemini API Key saved ✓');
             await startBackgroundScan(context, sidebarProvider);
@@ -235,7 +235,7 @@ export async function activate(context: vscode.ExtensionContext) {
       });
       if (key) {
         try {
-          await GeminiClient.complete(key, 'gemini-2.0-flash', 'You are a helpful assistant.', 'Hi');
+          await GeminiClient.complete(key, 'gemini-3.5-flash', 'You are a helpful assistant.', 'Hi');
           await AIProvider.setApiKey(context, key);
           showInfo('Gemini API Key saved ✓');
           await startBackgroundScan(context, sidebarProvider);

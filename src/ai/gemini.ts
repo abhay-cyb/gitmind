@@ -80,18 +80,16 @@ export class GeminiClient {
   ): Promise<string> {
     // 1. Resolve exact API model identifiers
     let actualModel = model;
-    if (model === 'gemini-2.5-pro') {
-      actualModel = 'gemini-2.5-pro-preview-06-05';
+    if (model === 'gemini-3.5-flash') {
+      actualModel = 'gemini-3.5-flash';
+    } else if (model === 'gemini-3.1-flash-lite') {
+      actualModel = 'gemini-3.1-flash-lite';
+    } else if (model === 'gemini-3.1-pro') {
+      actualModel = 'gemini-3.1-pro-preview';
     } else if (model === 'gemini-2.5-flash') {
-      actualModel = 'gemini-2.5-flash-preview-05-20';
-    } else if (model === 'gemini-2.0-flash') {
-      actualModel = 'gemini-2.0-flash';
-    } else if (model === 'gemini-2.0-flash-lite') {
-      actualModel = 'gemini-2.0-flash-lite';
-    } else if (model === 'gemini-1.5-flash') {
-      actualModel = 'gemini-1.5-flash';
-    } else if (model === 'gemini-1.5-pro') {
-      actualModel = 'gemini-1.5-pro';
+      actualModel = 'gemini-2.5-flash';
+    } else if (model === 'gemini-2.5-pro') {
+      actualModel = 'gemini-2.5-pro';
     }
 
     // 2. Try the primary model
@@ -108,17 +106,17 @@ export class GeminiClient {
         error.message.includes('Quota');
       
       if (isRetryable) {
-        // Fallback chain 1: Try gemini-2.0-flash-lite
-        if (actualModel !== 'gemini-2.0-flash-lite') {
+        // Fallback chain 1: Try gemini-3.1-flash-lite
+        if (actualModel !== 'gemini-3.1-flash-lite') {
           try {
-            return await this.executeRequest(apiKey, 'gemini-2.0-flash-lite', systemPrompt, userPrompt);
+            return await this.executeRequest(apiKey, 'gemini-3.1-flash-lite', systemPrompt, userPrompt);
           } catch (e2) {}
         }
         
-        // Fallback chain 2: Try gemini-1.5-flash
-        if (actualModel !== 'gemini-1.5-flash') {
+        // Fallback chain 2: Try gemini-2.5-flash
+        if (actualModel !== 'gemini-2.5-flash') {
           try {
-            return await this.executeRequest(apiKey, 'gemini-1.5-flash', systemPrompt, userPrompt);
+            return await this.executeRequest(apiKey, 'gemini-2.5-flash', systemPrompt, userPrompt);
           } catch (e3) {}
         }
       }
