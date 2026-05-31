@@ -23,7 +23,7 @@ export function parseGitHubIntent(message: string): GitHubIntent {
   let action: GitHubAction = 'unknown';
 
   if (
-    (hasWord('create') || hasWord('new') || hasWord('make')) &&
+    (hasWord('create') || hasWord('new') || hasWord('make') || lower.includes('naam se')) &&
     (hasWord('repo') || hasWord('repository'))
   ) {
     action = 'create_repo';
@@ -60,10 +60,27 @@ export function parseGitHubIntent(message: string): GitHubIntent {
   }
 
   // 2. Parameter Extraction
-  // repo name: extract word after "called", "named", "name" keywords
-  const nameMatch = message.match(/(?:called|named|name)\s+["']?([a-zA-Z0-9_.-]+)["']?/i);
-  if (nameMatch) {
-    params.name = nameMatch[1];
+  // Step 1 — quoted string (single or double quotes):
+  const quotedMatch = message.match(/['"]([a-zA-Z0-9_.\-]+)['"]/);
+  if (quotedMatch) {
+    params.name = quotedMatch[1];
+  }
+
+  // Step 2 — after keywords "called", "named", "name", "naam se", "naam":
+  const keywordMatch = message.match(/(?:called|named|name|naam\s*se|naam)\s+['"]?([a-zA-Z0-9_.\-]+)['"]?/i);
+  if (keywordMatch && !params.name) {
+    params.name = keywordMatch[1];
+  }
+
+  // Step 3 — last word in message if action is create_repo or create_branch and no name found yet:
+  if ((action === 'create_repo' || action === 'create_branch') && !params.name) {
+    const words = message.trim().split(/\s+/);
+    if (words.length > 0) {
+      const lastWord = words[words.length - 1].replace(/['"?,।]/g, '');
+      if (/^[a-zA-Z0-9_.\-]+$/.test(lastWord) && lastWord.length > 2) {
+        params.name = lastWord;
+      }
+    }
   }
 
   // branch names: extract words after "from" and "to" keywords
