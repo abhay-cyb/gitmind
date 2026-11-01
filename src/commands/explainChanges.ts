@@ -11,6 +11,31 @@ export interface ChatMessage {
   isHtml?: boolean;
 }
 
+export async function getAIResponse(
+  context: vscode.ExtensionContext,
+  query: string,
+  sidebarProvider: GitMindSidebarProvider
+): Promise<string> {
+  const hasGit = await isGitRepository();
+  const isGitQuery = /commit|change|diff|log|history|yesterday|today|week|day|what's new|added|fixed/i.test(query);
+
+  if (hasGit && isGitQuery) {
+    sidebarProvider.setLoader(true, 'Reading git logs for your query...');
+    const filterOptions = parseQuery(query);
+    const commits = await getCommitsFiltered(filterOptions);
+    sidebarProvider.setLoader(true, 'Summarizing changes...');
+    const userPrompt = getChangeSummarizerPrompt(query, commits);
+    const response = await AIProvider.callAI(context, userPrompt);
+    sidebarProvider.setLoader(false);
+    return response;
+  } else {
+    sidebarProvider.setLoader(true, 'Thinking...');
+    const response = await AIProvider.callAI(context, query);
+    sidebarProvider.setLoader(false);
+    return response;
+  }
+}
+
 export async function explainChangesCommand(
   context: vscode.ExtensionContext,
   query: string,
@@ -18,22 +43,7 @@ export async function explainChangesCommand(
   chatHistory: ChatMessage[]
 ): Promise<void> {
   try {
-    const hasGit = await isGitRepository();
-    const isGitQuery = /commit|change|diff|log|history|yesterday|today|week|day|what's new|added|fixed/i.test(query);
-
-    let response: string;
-
-    if (hasGit && isGitQuery) {
-      sidebarProvider.setLoader(true, 'Reading git logs for your query...');
-      const filterOptions = parseQuery(query);
-      const commits = await getCommitsFiltered(filterOptions);
-      sidebarProvider.setLoader(true, 'Summarizing changes...');
-      const userPrompt = getChangeSummarizerPrompt(query, commits);
-      response = await AIProvider.callAI(context, userPrompt);
-    } else {
-      sidebarProvider.setLoader(true, 'Thinking...');
-      response = await AIProvider.callAI(context, query);
-    }
+    const response = await getAIResponse(context, query, sidebarProvider);
 
     // Keep last 5 exchanges (10 messages total: 5 user, 5 assistant)
     const lastMsg = chatHistory[chatHistory.length - 1];
@@ -46,7 +56,6 @@ export async function explainChangesCommand(
       chatHistory.splice(0, chatHistory.length - 10);
     }
 
-    sidebarProvider.setLoader(false);
     sidebarProvider.updateChat(chatHistory);
   } catch (e: any) {
     sidebarProvider.setLoader(false);
@@ -90,24 +99,21 @@ function parseQuery(query: string): LogFilterOptions {
   }
 
   // Author filters
-  // e.g. "by John" or "commits by John"
   const authorMatch = lower.match(/(?:by|author:)\s*([a-zA-Z0-9_-]+)/);
   if (authorMatch) {
     options.author = authorMatch[1];
   }
 
-  // File filters (very simple heuristics looking for extensions or common files)
+  // File filters
   const words = lower.split(/\s+/);
   for (const word of words) {
     if (word.includes('.') || word.includes('/') || word.includes('\\')) {
-      // Remove symbols like quotes
       const cleanWord = word.replace(/['"`,]/g, '');
       options.file = cleanWord;
       break;
     }
   }
 
-  // If no explicit file was matched but keyword was found
   if (!options.file) {
     if (lower.includes('auth') || lower.includes('login') || lower.includes('signup')) {
       options.file = 'auth';

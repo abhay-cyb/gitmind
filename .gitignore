@@ -4,3 +4,4 @@ out/
 *.vsix
 .gitmind/
 .vscode-test/
+kiro-gateway/

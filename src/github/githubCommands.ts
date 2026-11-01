@@ -13,102 +13,66 @@ export interface GitHubIntent {
   params: Record<string, string>;
 }
 
-export function parseGitHubIntent(message: string): GitHubIntent {
-  const lower = message.toLowerCase();
-  const params: Record<string, string> = {};
+export function parseGitHubIntent(message: string): { action: GitHubAction, params: Record<string, string> } {
+  const m = message.toLowerCase().trim()
+  const params: Record<string, string> = {}
 
-  const hasWord = (word: string) => new RegExp(`\\b${word}\\b`, 'i').test(lower);
+  // Extract repo/branch name — priority: quoted → keyword → last noun word
+  const quotedMatch = message.match(/['""']([a-zA-Z0-9_.\-]+)['""']/)
+  if (quotedMatch) params.name = quotedMatch[1]
 
-  // 1. Parsing Rules
-  let action: GitHubAction = 'unknown';
+  const keywordMatch = message.match(
+    /(?:called|named|naam|name|rakhna|rakho|rakhe|ka naam)\s*[:'""']?\s*([a-zA-Z0-9_.\-]+)/i
+  )
+  if (keywordMatch && !params.name) params.name = keywordMatch[1]
 
-  if (
-    (hasWord('create') || hasWord('new') || hasWord('make') || lower.includes('naam se')) &&
-    (hasWord('repo') || hasWord('repository'))
-  ) {
-    action = 'create_repo';
-  } else if (
-    (hasWord('list') || hasWord('show') || hasWord('my') || hasWord('newest') || hasWord('recent')) &&
-    (hasWord('repo') || hasWord('repos') || hasWord('repository') || hasWord('repositories'))
-  ) {
-    action = 'list_repos';
-  } else if (
-    hasWord('branch') &&
-    (hasWord('create') || hasWord('new') || hasWord('make'))
-  ) {
-    action = 'create_branch';
-  } else if (
-    (lower.includes('pull request') || hasWord('pr')) &&
-    !lower.includes('merge')
-  ) {
-    action = 'create_pr';
-  } else if (
-    lower.includes('merge') &&
-    (hasWord('pr') || lower.includes('pull request'))
-  ) {
-    action = 'merge_pr';
-  } else if (
-    lower.includes('issue') &&
-    (hasWord('create') || hasWord('new') || hasWord('open'))
-  ) {
-    action = 'create_issue';
-  } else if (
-    lower.includes('issue') &&
-    (hasWord('list') || hasWord('show') || hasWord('open'))
-  ) {
-    action = 'list_issues';
+  // private flag
+  if (m.includes('private')) params.private = 'true'
+  if (m.includes('public')) params.private = 'false'
+
+  // PR number
+  const prNumMatch = message.match(/#(\d+)|\bpr\s*(\d+)/i)
+  if (prNumMatch) params.prNumber = prNumMatch[1] || prNumMatch[2]
+
+  // branch from/to
+  const fromMatch = message.match(/from\s+([a-zA-Z0-9_.\-\/]+)/i)
+  if (fromMatch) params.head = fromMatch[1]
+  const toMatch = message.match(/(?:to|into)\s+([a-zA-Z0-9_.\-\/]+)/i)
+  if (toMatch) params.base = toMatch[1]
+
+  // action detection — order matters, most specific first
+  if ((m.includes('merge') || m.includes('merge kar')) && (m.includes('pr') || m.includes('pull request'))) {
+    return { action: 'merge_pr', params }
   }
-
-  // 2. Parameter Extraction
-  // Step 1 — quoted string (single or double quotes):
-  const quotedMatch = message.match(/['"]([a-zA-Z0-9_.\-]+)['"]/);
-  if (quotedMatch) {
-    params.name = quotedMatch[1];
+  if ((m.includes('pull request') || m.includes(' pr ') || m.includes('pr bana') || m.includes('pr create') || m.includes('pr kholo')) && !m.includes('list') && !m.includes('show')) {
+    return { action: 'create_pr', params }
   }
-
-  // Step 2 — after keywords "called", "named", "name", "naam se", "naam":
-  const keywordMatch = message.match(/(?:called|named|name|naam\s*se|naam)\s+['"]?([a-zA-Z0-9_.\-]+)['"]?/i);
-  if (keywordMatch && !params.name) {
-    params.name = keywordMatch[1];
+  if ((m.includes('issue') || m.includes('bug')) && (m.includes('list') || m.includes('show') || m.includes('dikha') || m.includes('kitne') || m.includes('kya hai'))) {
+    return { action: 'list_issues', params }
   }
-
-  // Step 3 — last word in message if action is create_repo or create_branch and no name found yet:
-  if ((action === 'create_repo' || action === 'create_branch') && !params.name) {
-    const words = message.trim().split(/\s+/);
-    if (words.length > 0) {
-      const lastWord = words[words.length - 1].replace(/['"?,।]/g, '');
-      if (/^[a-zA-Z0-9_.\-]+$/.test(lastWord) && lastWord.length > 2) {
-        params.name = lastWord;
+  if ((m.includes('issue') || m.includes('bug report')) && (m.includes('create') || m.includes('bana') || m.includes('open') || m.includes('kholo') || m.includes('likho') || m.includes('add'))) {
+    return { action: 'create_issue', params }
+  }
+  if (m.includes('branch') && (m.includes('create') || m.includes('bana') || m.includes('new') || m.includes('naya') || m.includes('banao') || m.includes('banado'))) {
+    return { action: 'create_branch', params }
+  }
+  if ((m.includes('repo') || m.includes('repository')) && (m.includes('list') || m.includes('show') || m.includes('kitne') || m.includes('dikha') || m.includes('mere') || m.includes('mera') || m.includes('total') || m.includes('sabke') || m.includes('all'))) {
+    return { action: 'list_repos', params }
+  }
+  if ((m.includes('repo') || m.includes('repository')) && (m.includes('create') || m.includes('bana') || m.includes('new') || m.includes('naya') || m.includes('banao') || m.includes('banado') || m.includes('chahiye') || m.includes('rakhna'))) {
+    // extract name from last meaningful word if still not found
+    if (!params.name) {
+      const words = message.trim().split(/\s+/)
+      for (let i = words.length - 1; i >= 0; i--) {
+        const w = words[i].replace(/['"?,।।]/g, '')
+        if (/^[a-zA-Z0-9_.\-]{2,}$/.test(w) && !['repo','create','private','public','bana','kar','de','naa','please','ek','aur','and','the','a'].includes(w.toLowerCase())) {
+          params.name = w
+          break
+        }
       }
     }
+    return { action: 'create_repo', params }
   }
 
-  // branch names: extract words after "from" and "to" keywords
-  const fromMatch = message.match(/from\s+["']?([a-zA-Z0-9_/.-]+)["']?/i);
-  if (fromMatch) {
-    params.from = fromMatch[1];
-  }
-  const toMatch = message.match(/to\s+["']?([a-zA-Z0-9_/.-]+)["']?/i);
-  if (toMatch) {
-    params.to = toMatch[1];
-  }
-
-  // PR number: extract digits after "pr #", "pr number", or "#"
-  const prMatch = message.match(/(?:pr\s*#|pr\s*number\s*|#\s*)(\d+)/i);
-  if (prMatch) {
-    params.prNumber = prMatch[1];
-  }
-
-  // issue title: extract everything after "issue:" or "issue titled"
-  const issueMatch = message.match(/(?:issue:|issue\s+titled\s+)(.+)/i);
-  if (issueMatch) {
-    params.title = issueMatch[1].trim();
-  }
-
-  // private flag: message includes "private" -> params.private = "true"
-  if (lower.includes('private')) {
-    params.private = 'true';
-  }
-
-  return { action, params };
+  return { action: 'unknown', params }
 }

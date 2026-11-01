@@ -6,17 +6,20 @@ import { GeminiClient } from './ai/gemini';
 import { RepoScanner } from './scanner/repoScanner';
 import { findBreakingCommitCommand } from './commands/findBreakingCommit';
 import { explainConflictCommand, registerConflictAutoTrigger } from './commands/mergeConflict';
-import { explainChangesCommand } from './commands/explainChanges';
+import { getAIResponse } from './commands/explainChanges';
 import { isGitRepository, getGitClient, getCurrentBranch } from './git/status';
 import { showInfo, showError } from './ui/notifications';
 import { GitHubClient } from './github/githubClient';
 import { parseGitHubIntent } from './github/githubCommands';
+
+let currentSidebarProvider: GitMindSidebarProvider | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
   let chatHistory: Array<{ role: 'user' | 'assistant'; content: string; isHtml?: boolean }> = [];
 
   // Sidebar webview resolution and callback actions
   const sidebarProvider = new GitMindSidebarProvider(context.extensionUri, async (action) => {
+    currentSidebarProvider = sidebarProvider;
     // Graceful degradation check: Verify git repo for repository-specific commands
     const repoCommands = ['findBreakingCommit', 'explainConflict', 'refreshContext'];
     if (repoCommands.includes(action.command)) {
@@ -143,6 +146,8 @@ export async function activate(context: vscode.ExtensionContext) {
         break;
     }
   });
+
+  currentSidebarProvider = sidebarProvider;
 
   // Register Webview View
   context.subscriptions.push(
@@ -368,6 +373,19 @@ async function getGitRemoteOwnerRepo(): Promise<{ owner: string; repo: string } 
   return undefined;
 }
 
+async function callAI(
+  context: vscode.ExtensionContext,
+  query: string,
+  chatHistory: Array<{ role: 'user' | 'assistant'; content: string; isHtml?: boolean }>
+): Promise<string> {
+  if (!currentSidebarProvider) {
+    throw new Error('Sidebar provider not initialized');
+  }
+  // Avoid unused variable compile error
+  void chatHistory;
+  return await getAIResponse(context, query, currentSidebarProvider);
+}
+
 async function handleGitHubAction(
   context: vscode.ExtensionContext,
   sidebarProvider: GitMindSidebarProvider,
@@ -378,7 +396,7 @@ async function handleGitHubAction(
   if (!token) {
     chatHistory.push({
       role: 'assistant',
-      content: 'Connect GitHub first via Connect GitHub Account command.',
+      content: '❌ GitHub token expired. Reconnect: Ctrl+Shift+P → GitMind: Connect GitHub Account',
       isHtml: false
     });
     sidebarProvider.updateChat(chatHistory);
@@ -386,16 +404,6 @@ async function handleGitHubAction(
   }
 
   const intent = parseGitHubIntent(text);
-  if (intent.action === 'unknown') {
-    chatHistory.push({
-      role: 'assistant',
-      content: 'Unknown GitHub action. Please rephrase.',
-      isHtml: false
-    });
-    sidebarProvider.updateChat(chatHistory);
-    return;
-  }
-
   const client = new GitHubClient(token);
 
   try {
@@ -406,24 +414,23 @@ async function handleGitHubAction(
       case 'create_repo': {
         const name = intent.params.name;
         if (!name) {
-          throw new Error('Repository name is missing. Please specify the name.');
+          chatHistory.push({
+            role: 'assistant',
+            content: "Repo ka naam batao — 'testingv1 naam ka repo banao'",
+            isHtml: false
+          });
+          sidebarProvider.updateChat(chatHistory);
+          return;
         }
-        const desc = intent.params.description || 'Repository created by GitMind';
         const isPrivate = intent.params.private === 'true';
-        const repo = await client.createRepo(name, desc, isPrivate);
-        resultText = `Created repository: <a class="github-link" onclick="openUrl('${repo.url}')">${name}</a> (Private: ${isPrivate ? 'yes' : 'no'}) ✓`;
+        const repo = await client.createRepo(name, '', isPrivate);
+        resultText = `✅ Repo **${name}** create ho gaya!\n🔗 ${repo.url}`;
         break;
       }
 
       case 'list_repos': {
         const repos = await client.listRepos();
-        if (repos.length === 0) {
-          resultText = 'No repositories found.';
-        } else {
-          resultText = repos
-            .map(r => `• <a class="github-link" onclick="openUrl('${r.url}')">${r.fullName}</a> (Private: ${r.private ? 'yes' : 'no'})`)
-            .join('<br/>');
-        }
+        resultText = `📦 Aapke ${repos.length} repos:\n` + repos.map(r => `• ${r.name}`).join('\n');
         break;
       }
 
@@ -432,13 +439,18 @@ async function handleGitHubAction(
         if (!remote) {
           throw new Error('No GitHub remote origin configured in local git repository.');
         }
-        const newBranch = intent.params.name || intent.params.to;
-        if (!newBranch) {
-          throw new Error('Branch name is missing. Please specify the branch name.');
+        const name = intent.params.name;
+        if (!name) {
+          chatHistory.push({
+            role: 'assistant',
+            content: 'Branch ka naam batao',
+            isHtml: false
+          });
+          sidebarProvider.updateChat(chatHistory);
+          return;
         }
-        const fromBranch = intent.params.from || 'main';
-        await client.createBranch(remote.owner, remote.repo, newBranch, fromBranch);
-        resultText = `Created branch <strong>${newBranch}</strong> from <strong>${fromBranch}</strong> on GitHub ✓`;
+        await client.createBranch(remote.owner, remote.repo, name, intent.params.head || 'main');
+        resultText = `✅ Branch **${name}** create ho gaya!`;
         break;
       }
 
@@ -447,14 +459,39 @@ async function handleGitHubAction(
         if (!remote) {
           throw new Error('No GitHub remote origin configured in local git repository.');
         }
-        const head = intent.params.from || intent.params.name;
-        const base = intent.params.to || 'main';
+        const head = intent.params.head || intent.params.name;
+        const base = intent.params.base || 'main';
         if (!head) {
           throw new Error('Source branch (head) is missing. Specify using "from <branch>".');
         }
-        const title = intent.params.title || `PR from ${head} into ${base}`;
+        const title = intent.params.name || `PR from ${head} into ${base}`;
         const pr = await client.createPullRequest(remote.owner, remote.repo, title, 'Created via GitMind V2', head, base);
-        resultText = `Created Pull Request: <a class="github-link" onclick="openUrl('${pr.url}')">#${pr.number}: ${title}</a> ✓`;
+        resultText = `✅ PR create ho gaya! 🔗 ${pr.url}`;
+        break;
+      }
+
+      case 'create_issue': {
+        const remote = await getGitRemoteOwnerRepo();
+        if (!remote) {
+          throw new Error('No GitHub remote origin configured in local git repository.');
+        }
+        const title = intent.params.name || 'New Issue';
+        const issue = await client.createIssue(remote.owner, remote.repo, title, 'Created via GitMind V2');
+        resultText = `✅ Issue #${issue.number} create ho gaya! 🔗 ${issue.url}`;
+        break;
+      }
+
+      case 'list_issues': {
+        const remote = await getGitRemoteOwnerRepo();
+        if (!remote) {
+          throw new Error('No GitHub remote origin configured in local git repository.');
+        }
+        const issues = await client.listIssues(remote.owner, remote.repo);
+        if (issues.length === 0) {
+          resultText = 'No open issues found.';
+        } else {
+          resultText = `📦 Open issues:\n` + issues.map(i => `• #${i.number}: ${i.title}`).join('\n');
+        }
         break;
       }
 
@@ -468,60 +505,40 @@ async function handleGitHubAction(
           throw new Error('Pull request number is missing or invalid.');
         }
         await client.mergePullRequest(remote.owner, remote.repo, prNum);
-        resultText = `Merged PR <strong>#${prNum}</strong> successfully ✓`;
+        resultText = `✅ PR #${prNum} merge ho gaya!`;
         break;
       }
 
-      case 'create_issue': {
-        const remote = await getGitRemoteOwnerRepo();
-        if (!remote) {
-          throw new Error('No GitHub remote origin configured in local git repository.');
-        }
-        const title = intent.params.title;
-        if (!title) {
-          throw new Error('Issue title is missing. Specify after "issue:" or "issue titled".');
-        }
-        const issue = await client.createIssue(remote.owner, remote.repo, title, 'Created via GitMind V2');
-        resultText = `Created Issue: <a class="github-link" onclick="openUrl('${issue.url}')">#${issue.number}: ${title}</a> ✓`;
-        break;
-      }
-
-      case 'list_issues': {
-        const remote = await getGitRemoteOwnerRepo();
-        if (!remote) {
-          throw new Error('No GitHub remote origin configured in local git repository.');
-        }
-        const issues = await client.listIssues(remote.owner, remote.repo);
-        if (issues.length === 0) {
-          resultText = 'No open issues found for this repository.';
-        } else {
-          resultText = issues
-            .map(i => `• <a class="github-link" onclick="openUrl('${i.url}')">#${i.number}</a>: ${i.title}`)
-            .join('<br/>');
-        }
-        break;
+      case 'unknown':
+      default: {
+        chatHistory.push({
+          role: 'assistant',
+          content: "Samjha nahi. Example: 'testingv1 naam ka private repo banao'",
+          isHtml: false
+        });
+        sidebarProvider.updateChat(chatHistory);
+        return;
       }
     }
 
-    sidebarProvider.setThinking(false);
-    sidebarProvider.setThinking(false);
     chatHistory.push({
       role: 'assistant',
       content: resultText,
-      isHtml: true
+      isHtml: false
     });
     sidebarProvider.updateChat(chatHistory);
-  } catch (e: any) {
-    sidebarProvider.setThinking(false);
-    let friendlyError = e.message || 'An error occurred during transaction.';
-    if (e.message === 'GITHUB_UNAUTHORIZED') {
-      friendlyError = "GitHub token expired or invalid. Run 'GitMind: Connect GitHub Account' to reconnect.";
-    } else if (e.message === 'GITHUB_FORBIDDEN') {
-      friendlyError = "You don't have permission for this action on this repo.";
-    } else if (e.message === 'GITHUB_NOT_FOUND') {
-      friendlyError = "Repo or resource not found. Check the name and try again.";
-    } else if (e.message === 'GITHUB_UNPROCESSABLE') {
-      friendlyError = "GitHub rejected this action. The branch or PR may already exist.";
+  } catch (err: any) {
+    let friendlyError = '';
+    if (err.message === 'GITHUB_UNAUTHORIZED') {
+      friendlyError = "❌ GitHub token expired. Reconnect: Ctrl+Shift+P → GitMind: Connect GitHub Account";
+    } else if (err.message === 'GITHUB_FORBIDDEN') {
+      friendlyError = "❌ Is repo pe permission nahi hai.";
+    } else if (err.message === 'GITHUB_NOT_FOUND') {
+      friendlyError = "❌ Repo ya resource nahi mila. Naam check karo.";
+    } else if (err.message === 'GITHUB_UNPROCESSABLE') {
+      friendlyError = "❌ Ye action already exist karta hai (branch/PR duplicate ho sakta hai).";
+    } else {
+      friendlyError = "❌ GitHub error: " + err.message;
     }
 
     chatHistory.push({
@@ -530,6 +547,8 @@ async function handleGitHubAction(
       isHtml: false
     });
     sidebarProvider.updateChat(chatHistory);
+  } finally {
+    sidebarProvider.setThinking(false);
   }
 }
 
@@ -539,35 +558,33 @@ async function handleChatQuery(
   sidebarProvider: GitMindSidebarProvider,
   chatHistory: Array<{ role: 'user' | 'assistant'; content: string; isHtml?: boolean }>
 ): Promise<void> {
-  // 1. Add user bubble and render immediately
+  // 1. Add user message to chat
   chatHistory.push({ role: 'user', content: query });
   sidebarProvider.updateChat(chatHistory);
-
-  // 2. Show thinking state
   sidebarProvider.setThinking(true);
 
   try {
-    // 3. Check GitHub intent FIRST
+    // 2. CHECK GITHUB INTENT FIRST — before ANY AI call
     const intent = parseGitHubIntent(query);
+    
     if (intent.action !== 'unknown') {
+      // 3. Execute GitHub action directly — NO AI involved
       await handleGitHubAction(context, sidebarProvider, query, chatHistory);
-      sidebarProvider.setThinking(false);
-      return; // Stop here, don't call AI
+      return;  // ← RETURN HERE. Never reach AI.
     }
 
-    // 4. Only if intent.action === 'unknown':
-    await explainChangesCommand(context, query, sidebarProvider, chatHistory);
-  } catch (e: any) {
-    chatHistory.push({
-      role: 'assistant',
-      content: `<div style="color: #f48771; font-weight:600;">Error:</div> ${e.message || e}`,
-      isHtml: true
-    });
-  }
+    // 4. Only unknown intents go to AI
+    const response = await callAI(context, query, chatHistory);
+    chatHistory.push({ role: 'assistant', content: response });
+    sidebarProvider.updateChat(chatHistory);
 
-  // 5. Update UI state
-  sidebarProvider.setThinking(false);
-  sidebarProvider.updateChat(chatHistory);
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Something went wrong';
+    chatHistory.push({ role: 'assistant', content: 'Error: ' + errorMsg });
+    sidebarProvider.updateChat(chatHistory);
+  } finally {
+    sidebarProvider.setThinking(false);
+  }
 }
 
 export function deactivate() {}
